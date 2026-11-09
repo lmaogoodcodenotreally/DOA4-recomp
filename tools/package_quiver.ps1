@@ -14,7 +14,8 @@ $bins=@(
   "$lbt\DOA4Launcher-tui.exe",
   "$cbt\compiler.exe",
   "$cbt\compiler-tui.exe",
-  "$repo\tools\extract-xiso.exe"
+  "$repo\tools\extract-xiso.exe",
+  "$repo\tools\extract-xiso-LICENSE.txt"
 )
 # Codegen tool (rexgluerd.exe) from the dev lean build, if present
 if (Test-Path "$lean\sdk-bin\rexgluerd.exe") { $bins += "$lean\sdk-bin\rexgluerd.exe" }
@@ -43,11 +44,11 @@ skip_intro = true
 present_letterbox = false
 '@ | Set-Content "$dest\doa4retail.toml"
 @'
-DOA4-recomp for Quiver (Rust launcher/compiler, no .NET)
+DOA4-recomp for Quiver (Rust launcher/compiler, no .NET, no prebuilt game exe)
 1. Run compiler.exe (GUI) or compiler-tui.exe (TUI in terminal), pick your USA Rev 1 ISO/XISO.
-   It checks/installs 7-Zip, CMake, Ninja, LLVM if missing (Yes/No), extracts game\ and recompiles.
+   It checks/installs 7-Zip, CMake, Ninja, LLVM if missing (Yes/No), extracts game\ (extract-xiso) and recompiles.
 2. Run DOA4Launcher.exe (GUI) or DOA4Launcher-tui.exe (TUI) to set display/graphics/input, then Launch.
-No game data is included in this download.
+No game data, no prebuilt executable is included. You must supply your own ISO.
 '@ | Set-Content "$dest\README-INSTALL.txt"
 Compress-Archive "$dest\*" "$repo\publish\DOA4-recomp-win-x64.zip" -Force
 Write-Host "wrote $repo\publish\DOA4-recomp-win-x64.zip"

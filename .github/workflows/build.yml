@@ -1,12 +1,66 @@
 name: build
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  release:
+    types: [created]
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: '10.0.x' }
-      - run: dotnet publish launcher/Doa4Launcher.csproj -c Release
-      - run: dotnet publish compiler/Doa4Compiler.csproj -c Release
-      - run: dir launcher/publish, compiler/publish
+        with: { submodules: recursive }
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --manifest-path rust/compiler/Cargo.toml
+      - run: cargo build --release --manifest-path rust/launcher/Cargo.toml
+      - name: Package release zip (compiler + launcher + SDK + sources, no game, no prebuilt exe)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path publish | Out-Null
+          $dest = "publish/DOA4-recomp-win-x64"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          # Rust GUI/TUI exes
+          Copy-Item rust/compiler/target/release/compiler.exe, rust/compiler/target/release/compiler-tui.exe $dest -Force
+          Copy-Item rust/launcher/target/release/DOA4Launcher.exe, rust/launcher/target/release/DOA4Launcher-tui.exe $dest -Force
+          # Bundled XISO extractor + license
+          Copy-Item tools/extract-xiso.exe $dest -Force
+          Copy-Item tools/extract-xiso-LICENSE.txt $dest -Force
+          # Codegen tool: build from vendored SDK when present
+          if (Test-Path "thirdparty/rexglue-sdk/CMakeLists.txt") { Write-Host "SDK present - rexgluerd built in recompile step" }
+          # Source tree needed for recompile (codegen + cmake build), minus game/generated/out
+          Copy-Item doa4retail_manifest.toml, CMakeLists.txt, CMakePresets.json $dest -Force
+          Copy-Item doa4retail_manifest.toml canned_manifest.tmp
+          Copy-Item src $dest -Recurse -Force
+          Copy-Item thirdparty $dest -Recurse -Force
+          Copy-Item .gitmodules $dest -Force
+          Copy-Item doa4retail_manifest.toml "$dest/saved_manifest.txt" -Force
+          # Default game config
+          @'
+          game_data_root = "game"
+          gpu_plugin = "xenos"
+          fullscreen = true
+          mnk_mode = true
+          input_backend = "sdl"
+          present_effect = "cas"
+          scaled_point_filter_linear = true
+          aspect_ratio = -1
+          skip_intro = true
+          present_letterbox = false
+          '@ | Set-Content "$dest/doa4retail.toml"
+          @'
+          DOA4-recomp for Quiver (Rust launcher/compiler, no .NET, no prebuilt game exe)
+          1. Run compiler.exe (GUI) or compiler-tui.exe (TUI), pick your USA Rev 1 ISO/XISO.
+             It checks/installs 7-Zip, CMake, Ninja, LLVM if missing (Yes/No), extracts game\ and recompiles.
+          2. Run DOA4Launcher.exe (GUI) or DOA4Launcher-tui.exe (TUI) to set display/graphics/input, then Launch.
+          No game data, no prebuilt executable is included. You must supply your own ISO.
+          '@ | Set-Content "$dest/README-INSTALL.txt"
+          Compress-Archive "$dest/*" "publish/DOA4-recomp-win-x64.zip" -Force
+          Write-Host "release zip ready"
+      - uses: actions/upload-artifact@v4
+        with: { name: DOA4-recomp-win-x64, path: publish/DOA4-recomp-win-x64.zip }
+      - name: Upload to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: publish/DOA4-recomp-win-x64.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
