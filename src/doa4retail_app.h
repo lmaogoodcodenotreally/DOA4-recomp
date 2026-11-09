@@ -20,83 +20,30 @@
 #include <rex/ui/imgui_drawer.h>
 #include <rex/ui/keybinds.h>
 
-// Lean play profile (build preset win-amd64-relwithdebinfo-lean): compiles
-// out ALL project-side instrumentation -- the F5/F6 debug tab, the state
-// poller / [state] label, and the DOA4_DUMP_IMAGE hook -- so play sessions
-// carry zero debug overhead. The SDK's TEMP probes stay in the DLLs but are
-// made inert at runtime by REX_DIAG=0 (see start_doa4_lean.ps1). Default 0:
-// the dev build keeps everything.
+// Lean play profile (DOA4_LEAN). Design: docs/architecture.md.
 #ifndef DOA4_LEAN
 #define DOA4_LEAN 0
 #endif
 
-// State poll address (state/stage work): guest u32 polled once per frame by
-// rex::perf::PollState as the current state id. 0x82C31C24 = MSEL screen
-// code global (RE: written by menu dispatcher sub_8252C550 with the matched
-// screen code; reset to -1 by sub_8253D960 when the menu system tears down
-// -> >= 0 = menu screen, -1 = outside the menus: gameplay / title / load).
-// v2 (state/stage work): OnPostSetup registers SetStatePollFn instead, which
-// packs several RE'd globals (game state, stage ids, chars, screen code,
-// record state) into one int64 -- this address stays as the v1 fallback and
-// is ignored while the poll fn is set. Declared here and set in OnPostSetup
-// so the SDK stays game-agnostic.
+// State poll (v1 fallback address; v2 poll fn in OnPostSetup). Design:
+// docs/architecture.md, docs/debug.md.
 REXCVAR_DECLARE(uint32_t, perf_state_addr);
 
 #if !DOA4_LEAN
-// ---------------------------------------------------------------------------
-// DOA4 debug tab (retail), toggled with F5; F6 marks a felt hitch in the log.
-//
-// Content: the live game-state pack (see PollGuestState for the addresses and
-// the user-decoded mode map: fs=1/bk=1 press-start; fs=2/bk=2 + scr=5 +
-// stg0==0 main-menu character select; scr=5 + stg0!=0 main-menu mode select;
-// scr=8 stage select; fs=3 story; fs=4 time attack; fs=5 versus; fs=6
-// survival/victory; fs=8 team battle; fs=9 sparring; fs=11/bk=11/scr=8
-// watch) plus the live stage-select
-// chain (retail addresses resolved 2026-10-13 from the loaded image, see
-// E3_to_retail.md section 8: applier 0x823B2578 <-> globals 0x82C79B18/14/1C,
-// cfg 0x83040090, slot table 0x82FFC0A8, scene dispatcher 0x8252C550).
-//
-// Interactions: MarkState (also F6) drops a timestamped USERMARK line with
-// the full state pack PLUS the stage chain into the game log at the instant
-// of a felt hitch -- the primary manual-repro breadcrumb for the
-// transition/preview-hitch hunt. The chain section also self-logs its own
-// value changes (rate-limited "DOA4DBG chain" lines + an on-screen churn
-// rate), so unexpected per-frame chain activity -- e.g. the applier being
-// re-run while a menu is up, which shows as the stage obj flickering --
-// lands in the log without a manual mark. "Set cursor[0]" pokes the picker
-// cursor byte (the game's own resolver -> applier interaction path); the
-// cfg dump is read-only.
+// DOA4 debug tab (F5 toggle, F6 mark). Design: docs/debug.md.
 class Doa4DebugDialog : public rex::ui::ImGuiDialog {
  public:
   using GuestBaseFn = std::function<uint8_t*()>;
   using MarkFn = std::function<void(const char* why)>;
 
-  // RETAIL addresses RESOLVED 2026-10-13 by offline analysis of the loaded
-  // (decompressed) retail image, tracing the documented E3 chain by
-  // structural signatures (see E3_to_retail.md section 5). Verified against
-  // the boot dump: the applier's invalidate path stores -1/-1/0x7FFFFFFF,
-  // exactly the values found at these addresses at boot.
-  //   0x82C79B18: active stage ID, u16 BE, -1 = none   (E3: word_82A777A0)
-  //   0x82C79B14: sub-stage ID,    u16 BE, -1 = none   (E3: word_82A7779C)
-  //   0x82C79B1C: stage object ptr, u32 BE, 0x7FFFFFFF = none
-  //               ([0]=self, [4]=sub-id, [6]=stage ID) (E3: dword_82A777A4)
-  //   0x83040090: active-stage config struct; word0 = 0x7FFFFFFF marker;
-  //               u16 at +0x04/+0x06/+0x08, per-player rows +0x208/+0x308
-  //               (E3: dword_82CEF158)
-  //   0x82FFC0A8: per-slot stage byte table, 0xFF = invalid; resolved by
-  //               slot resolver 0x82388AD8 -> stage entry =
-  //               0x82FFB5B8 + slot_byte*20 (E3: byte_82CE8D48)
-  // Chain: scene dispatcher 0x8252C550 (reads scr @0x82C31C24, -1 = outside)
-  //        -> MSEL slot resolver 0x82388AD8 (sibling 0x82388B88)
-  //        -> applier 0x823B2578 writes the three globals + cfg.
+  // Retail stage-chain addresses. Map: docs/debug.md.
   static constexpr uint32_t kRetailActiveStageId = 0x82C79B18;   // E3: 0x82A777A0
   static constexpr uint32_t kRetailSubStageId = 0x82C79B14;      // E3: 0x82A7779C
   static constexpr uint32_t kRetailActiveStageObj = 0x82C79B1C;  // E3: 0x82A777A4
   static constexpr uint32_t kRetailStageCfg = 0x83040090;        // E3: 0x82CEF158
   static constexpr uint32_t kRetailSlotTable = 0x82FFC0A8;       // E3: 0x82CE8D48
   static constexpr uint32_t kRetailPickerCursor = 0x83035CC4;    // picker byte 0
-  // Dump only the region the applier actually writes (through the +0x308
-  // per-player row); the E3 0xFB0 size is not verified for retail.
+  // Dump size: applier-written region only (see docs/debug.md).
   static constexpr uint32_t kStageCfgSize = 0x310;
 
   Doa4DebugDialog(rex::ui::ImGuiDrawer* drawer, GuestBaseFn guest_base,
@@ -178,11 +125,7 @@ class Doa4DebugDialog : public rex::ui::ImGuiDialog {
                             ReadBE16(base, obj + 4), ReadBE16(base, obj + 6));
       }
 
-      // Chain churn instrument. The applier (0x823B2578) both applies AND
-      // clears the chain (arg0 == 0x7FFFFFFF -> invalidate path), so any
-      // caller re-running it per frame shows up here as value churn -- on
-      // screen as the stage obj flickering, in the log as rate-limited
-      // "DOA4DBG chain" lines with the change rate and exact values.
+      // Chain churn instrument (see docs/debug.md).
       const uint64_t sig = (static_cast<uint64_t>(stage_id) << 48) |
                            (static_cast<uint64_t>(sub_id) << 32) | obj;
       const auto now = std::chrono::steady_clock::now();
@@ -235,11 +178,7 @@ class Doa4DebugDialog : public rex::ui::ImGuiDialog {
         if (i != 11) ImGui::SameLine();
       }
 
-      // --- Interactive: move the picker cursor / dump config ---------------
-      // Writing the CURSOR byte is the game's own interaction path (the same
-      // thing moving the picker does): slot resolver 0x82388AD8 -> applier
-      // 0x823B2578 then update the stage globals itself. Writing the stage-ID
-      // global directly would NOT load anything (the applier does the work).
+      // Interactive cursor poke: game's own interaction path (see docs/debug.md).
       ImGui::InputInt("picker slot", &force_stage_id_);
       ImGui::SameLine();
       if (ImGui::Button("Set cursor[0]")) {
@@ -275,17 +214,13 @@ class Doa4DebugDialog : public rex::ui::ImGuiDialog {
     return p >= 0x82000000u && p < 0x83600000u;
   }
 
-  // User-decoded retail mode map (ground truth from manual playtests; see
-  // the class comment). Unrecognized combos print as "other (fs,bk)".
+  // Retail mode map (see docs/debug.md).
   static const char* ModeName(unsigned fs, unsigned bk, int scr, unsigned st0,
                               unsigned st1) {
     if (fs == 1 && bk == 1) return "press-start";
     if (fs == 2 && bk == 2) {
       if (scr == 8) return "stage select";
-      // Discriminator is the FIRST picker byte only (user-confirmed):
-      // stg0==0 = character select (S1 evidence: stg=(0,40) char0=5 sat
-      // there 38% of the run -- st1 is not the discriminator), stg0!=0 =
-      // the mode-select menu layer.
+      // Discriminator is stg0 only (see docs/debug.md).
       if (scr == 5) {
         return st0 == 0 ? "main-menu character select" : "main-menu mode select";
       }
@@ -303,15 +238,14 @@ class Doa4DebugDialog : public rex::ui::ImGuiDialog {
     }
   }
 
-  // User-confirmed picker->stage anchors (2D picker: one byte per axis).
+  // Picker anchors (see docs/debug.md).
   static const char* PickerAnchor(unsigned st0, unsigned st1) {
     if (st0 == 0 && st1 == 12) return "Biolab Core";
     if (st0 == 26 && st1 == 12) return "Waterfall Valley";
     return nullptr;
   }
 
-  // Stage FILE id -> code, RETAIL order (33 {tpr,dat} pairs at 0x82C5C558;
-  // 144 = random). Kept for the pending picker->file map.
+  // Stage FILE ids (see docs/debug.md).
   static const char* StageName(unsigned id) {
     static constexpr const char* kStages[33] = {
         "MK",  "MK2", "DS",  "BO",  "TC",  "NY",  "NY2", "TS",
@@ -359,7 +293,7 @@ class Doa4retailApp : public rex::ReXApp {
  public:
   using rex::ReXApp::ReXApp;
 
-  // DOA4 debug tab (F5 toggle, F6 mark): see Doa4DebugDialog above.
+  // DOA4 debug tab (see docs/debug.md).
 #if !DOA4_LEAN
   std::unique_ptr<rex::ui::ImGuiDialog> debug_tab_;
 #endif
@@ -371,11 +305,7 @@ class Doa4retailApp : public rex::ReXApp {
   }
 
 #if !DOA4_LEAN
-  // TEMP DIAGNOSTIC (state/stage RE, armed 2026-10-08): when the
-  // DOA4_DUMP_IMAGE env var holds a host path, dump the loaded guest image
-  // there for offline string/xref analysis (locating state / stage / char
-  // globals). No effect unless the env var is set; stays armed until the
-  // state tracker ships.
+  // Guest-image dump (DOA4_DUMP_IMAGE). See docs/debug.md.
   void OnPostLoadXexImage() override {
     const char* path = std::getenv("DOA4_DUMP_IMAGE");
     if (!path || !*path) {
@@ -400,28 +330,14 @@ class Doa4retailApp : public rex::ReXApp {
                  path);
   }
 
-  // TEMP DIAGNOSTIC (state tracker v2, armed 2026-10-08): point the SDK's
-  // once-per-frame state poll at the game-side packer below (v2, IDA-RE'd
-  // globals) and register the labeler used by the [state] log lines, the
-  // debug overlay state row and the per-state fps summary at exit. Frame
-  // attribution comes from the perf CSV state_id column (one byte per
-  // field, low byte first -- see PollGuestState). The v1 address poll stays
-  // set as the documented fallback: it is ignored while the poll fn is
-  // registered (SDK precedence), so removing SetStatePollFn restores v1.
-  // Menu-vs-fight discrimination in the label is finalized from the R30
-  // evidence (value spaces of fs/bk/rec); stays armed until then.
+  // State tracker v2 (see docs/debug.md).
   void OnPostSetup() override {
     rex::perf::SetStatePollFn(&Doa4retailApp::PollGuestState);
     rex::perf::SetStateLabelFn(&Doa4retailApp::StateLabel);
     REXCVAR_SET(perf_state_addr, 0x82C31C24u);  // v1 fallback (see above)
   }
 
-  // DOA4 debug tab (transition/preview-hitch hunt tooling): F5 toggles the
-  // in-game state view (Doa4DebugDialog), F6 drops a USERMARK breadcrumb
-  // line with the full state pack into the game log at the moment of a felt
-  // hitch. F5/F6 are free of SDK binds (F3 debug, F4 settings, F7
-  // achievements, Backtick console); both show up rebindable in the settings
-  // overlay. Kept app-side so the SDK stays game-agnostic.
+  // F5/F6 binds (see docs/architecture.md, docs/debug.md).
   void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {
     rex::ui::RegisterBind("bind_doa4_debug", "F5", "Toggle DOA4 debug tab",
                           [this, drawer] {
@@ -448,10 +364,7 @@ class Doa4retailApp : public rex::ReXApp {
     debug_tab_.reset();
   }
 
-  // Timestamped breadcrumb: pressed by the user the instant they feel a
-  // hitch (F6 or the debug-tab button). The log line carries the same state
-  // pack as the [state] attribution, so the run log and the perf CSV can be
-  // aligned to the felt event instead of to a guessed timestamp.
+  // Felt-hitch breadcrumb (see docs/debug.md).
   void MarkState(const char* why) {
     const uint8_t* base = runtime() ? runtime()->virtual_membase() : nullptr;
     if (!base) {
@@ -462,10 +375,7 @@ class Doa4retailApp : public rex::ReXApp {
                             (static_cast<uint32_t>(base[0x82C31C24u + 2]) << 8) |
                             static_cast<uint32_t>(base[0x82C31C24u + 3]);
     const int scr = (scr_be == 0xFFFFFFFFu) ? -1 : static_cast<int>(scr_be & 0xFF);
-    // Stage chain (retail addresses resolved 2026-10-13, E3_to_retail.md
-    // section 8): active stage id / sub id (u16 BE, -1 = none) and the stage
-    // object pointer (u32 BE, 0x7FFFFFFF = none). Appended so every mark
-    // captures what the stage system was doing at the felt event.
+    // Stage chain (see docs/debug.md).
     const uint16_t stage_id = static_cast<uint16_t>(
         (static_cast<uint16_t>(base[0x82C79B18u]) << 8) | base[0x82C79B18u + 1]);
     const uint16_t sub_id = static_cast<uint16_t>(
@@ -482,24 +392,7 @@ class Doa4retailApp : public rex::ReXApp {
         stage_id, sub_id, obj);
   }
 
-  // TEMP DIAGNOSTIC (state tracker v2): packs the state globals found by
-  // IDA RE into one int64, one byte per field (field i = bits 8i..8i+7):
-  //   [0]  byte_83035CC0        game-state byte (fs)
-  //   [1]  byte_82FCC93B        game-state mirror (bk)
-  //   [2]  byte_83035CC4        stage id side 0 (0..32 retail path-table
-  //                             order at 0x82C5C558, 144 = random)
-  //   [3]  byte_83035CC5        stage id side 1
-  //   [4]  u8 of 0x82C31C24 BE  MSEL screen code (-1 -> 0xFF)
-  //   [5]  byte_83033B41        battle record 0 char id
-  //   [6]  byte_83033B41 + 156  battle record 1 char id
-  //   [7]  reserved 0
-  // Each byte is event-driven (selection/commit/battle-entry), so transitions
-  // stay sparse; fs/bk are the fight-vs-menu discriminator candidates this
-  // run observes. R30 finding: byte_83033B77 (record state) was field [7]
-  // and churned 1-3x/sec in EVERY mode (menus and fights) -> it fragmented
-  // the per-state attribution rows and spammed transitions, so it was
-  // dropped from the pack (keep it out); [7] stays 0, which also makes the
-  // INT64_MIN "unset" sentinel impossible (top byte 0 -> bit 63 clear).
+  // State pack (see docs/debug.md).
   static int64_t PollGuestState(const uint8_t* base) {
     if (!base)
       return INT64_MIN;
@@ -519,22 +412,7 @@ class Doa4retailApp : public rex::ReXApp {
     return static_cast<int64_t>(v);
   }
 
-  // Stage FILE id -> code, RETAIL order: 33 {tpr,dat} pointer pairs at
-  // 0x82C5C558 in the shipped image (byte-verified; differs from the E3
-  // demo order -- do not reuse across targets). RE: stagesel_commit writes
-  // to byte_83035CC4 (stage-select byte 0) / byte_83035CC5 (byte 1);
-  // 144 = random (stage_random_flag byte_82FCC8E7).
-  //
-  // NOT used by StateLabel anymore: R31-R33 showed the two live bytes are
-  // stage-select PICKER coordinates, not path-table file ids -- during the
-  // R33 cursor walk each menu move changed exactly ONE byte (2D picker:
-  // one byte per axis, incl. the 0->26 wrap) while hovering known stages,
-  // values (36/37/40) exist beyond the 33-entry table, and the fight runs
-  // keep whatever pair the picker confirmed ((0,12)=Biolab Core and
-  // (26,12)=Waterfall Valley are the user-confirmed anchors). The grid
-  // holds day/night variants as separate cells (user: KYO=Kyoto in Bloom,
-  // playable day+night -> path table KYO/KYN pair), which is why picker
-  // values run past 33. Keep this table for a future picker->file map.
+  // Stage FILE ids (see docs/debug.md).
   static const char* StageName(unsigned id) {
     static constexpr const char* kStages[33] = {
         "MK",  "MK2", "DS",  "BO",  "TC",  "NY",  "NY2", "TS",
@@ -555,20 +433,7 @@ class Doa4retailApp : public rex::ReXApp {
     return unk[slot];
   }
 
-  // Labeler for the packed value produced by PollGuestState (see
-  // OnPostSetup). Raw decode of every field. The two stage bytes print as
-  // a RAW pair "stg=(a,b)" -- R33 proved they are stage-select picker
-  // coordinates (each cursor move flips exactly one byte), so the old
-  // "stage:NAME" decoding (path-table file names) was a misnomer; names
-  // stay in the ledger as anchors only: (0,12)=Biolab Core,
-  // (26,12)=Waterfall Valley. fs/bk/scr carry menu-vs-fight context
-  // (fs=5+scr=8 real fight, fs=1 demo/attract, fs=2 menu).
-  //
-  // Return-buffer contract: a transition line (counter.cpp) formats TWO
-  // labels (old + new) in ONE snprintf, so a single shared static buffer
-  // aliases (R30 showed "X -> X" for every transition: both pointers hit the
-  // same thread_local slot and the second call won). Use a 2-slot rotation
-  // so two consecutive StateLabel calls return distinct buffers.
+  // State labeler (see docs/debug.md).
   static const char* StateLabel(int64_t value) {
     if (value == INT64_MIN)
       return "unset";

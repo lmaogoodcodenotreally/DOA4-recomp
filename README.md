@@ -8,6 +8,9 @@ downloads the GitHub release zip, runs `compiler.exe`, then the game.
 launcher, compiler). Decompiled `generated/doa4/` and the `assets/game/`
 dump are git-ignored and must never be published.
 
+Docs: [architecture](docs/architecture.md) ·
+[hooks](docs/hooks.md) · [debug](docs/debug.md)
+
 ## For players (Quiver)
 
 1. Install from Quiver (or unzip the release zip anywhere).

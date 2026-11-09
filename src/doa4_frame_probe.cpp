@@ -1,12 +1,4 @@
-// TEMP probe (frame interpolation RE, 2026-10-16): which part of one main-loop
-// iteration issues the GPU work. Every direct child of frame_systems_tick
-// (sub_824F4878) and of the main loop (sub_824F41E0) is wrapped; the
-// outermost wrapped function on the stack is the "tag", and every D3D
-// draw/clear/resolve primitive (found by their PM4 DRAW_INDX/DRAW_INDX_2
-// headers) counts against the current tag. Static reach cannot see vtable
-// draws, this can. Every 600 presents it logs DRAWPROBE rows per
-// (tag, game mode, loading gate) with per-frame averages.
-// Dev build only, inert unless DOA4_DRAWPROBE=1.
+// TEMP draw probe (dev only). Design: docs/debug.md.
 
 #include "generated/doa4/doa4retail_init.h"
 
@@ -170,8 +162,7 @@ DOA4_PRIM(8274ECA8, 0)
 DOA4_PRIM(8274F0C0, 1)
 DOA4_PRIM(8274FDD8, 2)
 
-// The loading gate: r3 != 0 = the transition/loading branch ran instead of
-// the gameplay branch (sub_82566B80 ... sub_82354F30).
+// Loading-gate sampler (see docs/debug.md).
 REX_EXTERN(__imp__sub_824F4E90);
 REX_HOOK_RAW(sub_824F4E90) {
   if (!Enabled()) {
@@ -200,7 +191,7 @@ REX_HOOK_RAW(sub_824F4398) {
     std::lock_guard lk(g_mu);
     ++g_frames_per_mode[g_mode];
   }
-  // next tick's mode: game mode byte (fs, see doa4retail_app.h), gate resets
+  // Next tick: resample mode byte (see docs/debug.md).
   g_mode = base[0x83035CC0u];
   if (++g_frames % 600 == 0) Dump();
 }

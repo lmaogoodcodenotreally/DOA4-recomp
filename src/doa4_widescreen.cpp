@@ -1,15 +1,4 @@
-// True widescreen, 3D part.
-//
-// Every 3D camera builds its projection in sub_8231A3D8(fov f1, aspect f2,
-// near f3, far f4): m00 = 1 / (tan(fov/2) * aspect), m11 = 1 / tan(fov/2), so
-// the field of view is vertical and a wider aspect shows more at the sides
-// (Hor+). Its view-frustum twin sub_8231A658(fov f1, ?, aspect f3, near f4,
-// far f5) feeds culling (sub_8276C160). The HD cameras pass 16:9 (constant
-// 0x822BCAAC, or 1 / 0.5625 in sub_8231A4D8); other callers pass their own
-// shape (4:3 constant 0x822BCA40, render-to-texture cameras) and are left
-// alone. The guest still renders 1280x720: the presenter stretches it to the
-// window (present_letterbox=false), and the wider projection makes that
-// stretch come out geometrically correct.
+// True widescreen (Hor+) 3D hook. Design: docs/hooks.md.
 
 #include "generated/doa4/doa4retail_init.h"
 

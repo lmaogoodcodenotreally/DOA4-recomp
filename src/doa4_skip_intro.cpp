@@ -1,13 +1,4 @@
-// skip_intro, disclaimer part (the boot movie part lives in the SDK's
-// xfile.cpp, which ends the first .sfd opened).
-//
-// Boot runs sub_82403518: sub_82403610 (the warning/disclaimer screen) and
-// then movie 18 (ninja_vi_hd.sfd). sub_82403610 starts the screen and loops a
-// frame at a time until its ~54.6 s timer ends (sub_823A7370) or
-// sub_82404AD0(pad) sees A/Start on pad 0-3. With skip_intro on, that press
-// check answers "pressed" while the disclaimer runs, so the game takes its
-// own button exit before the first frame. sub_82404AD0's only other caller
-// is the low-refresh-rate warning (sub_82406458), which is left alone.
+// Skip-intro disclaimer hook. Design: docs/hooks.md.
 
 #include "generated/doa4/doa4retail_init.h"
 
