@@ -152,6 +152,14 @@ pub fn recompile(app_dir: &Path) -> Result<PathBuf, String> {
     let st = Command::new(&cmake).current_dir(app_dir).args(["--build", "--preset", "win-amd64-relwithdebinfo-lean"]).output().map_err(|e| e.to_string())?;
     let _ = st;
     let out = app_dir.join("out/build/win-amd64-relwithdebinfo-lean/doa4retail.exe");
-    if out.exists() { std::fs::copy(&out, app_dir.join("doa4retail.exe")).map_err(|e| e.to_string())?; }
+    if !out.exists() { return Err("cmake build did not produce doa4retail.exe".into()); }
+    std::fs::copy(&out, app_dir.join("doa4retail.exe")).map_err(|e| e.to_string())?;
+    // Copy runtime DLLs built alongside the exe so it can launch.
+    for dll in ["rexruntimerd.dll", "rexgpu-xenosrd.dll", "amd_fidelityfx_dx12drel.dll"] {
+        let src = app_dir.join("out/build/win-amd64-relwithdebinfo-lean").join(dll);
+        if src.exists() { let _ = std::fs::copy(&src, app_dir.join(dll)); }
+        let src2 = app_dir.join("out/build/win-amd64-relwithdebinfo-lean/sdk-bin").join(dll);
+        if src2.exists() { let _ = std::fs::copy(&src2, app_dir.join(dll)); }
+    }
     Ok(app_dir.join("doa4retail.exe"))
 }

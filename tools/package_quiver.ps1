@@ -1,5 +1,7 @@
-# Package the Quiver release zip: exes + DLLs + Rust launcher/compiler (GUI+TUI), NO game data.
-# Run after a lean build (win-amd64-relwithdebinfo-lean) and cargo build --release.
+# Package the Quiver release zip: Rust launcher/compiler (GUI+TUI) + extract-xiso +
+# rexgluerd codegen + source tree. NO game binary, NO game data, NO generated/.
+# doa4retail.exe / DLLs are built by compiler.exe's recompile step, not shipped.
+# Run after cargo build --release (lean exe is built during recompile, not here).
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent $PSScriptRoot
 $lean="$repo\out\build\win-amd64-relwithdebinfo-lean"
@@ -8,18 +10,15 @@ New-Item -ItemType Directory -Force -Path $dest | Out-Null
 $cbt="$repo\rust\compiler\target\release"
 $lbt="$repo\rust\launcher\target\release"
 $bins=@(
-  "$lean\doa4retail.exe",
-  "$lean\rexruntimerd.dll",
-  "$lean\rexgpu-xenosrd.dll",
-  "$lean\amd_fidelityfx_dx12drel.dll",
   "$lbt\DOA4Launcher.exe",
   "$lbt\DOA4Launcher-tui.exe",
   "$cbt\compiler.exe",
   "$cbt\compiler-tui.exe",
   "$repo\tools\extract-xiso.exe"
 )
-# Optional codegen tool (rexgluerd.exe) from the dev lean build, if present
+# Codegen tool (rexgluerd.exe) from the dev lean build, if present
 if (Test-Path "$lean\sdk-bin\rexgluerd.exe") { $bins += "$lean\sdk-bin\rexgluerd.exe" }
+if (Test-Path "G:\Games\DOA4_E3\DOA4_Retail_Native\out\build\win-amd64-relwithdebinfo-lean\sdk-bin\rexgluerd.exe") { $bins += "G:\Games\DOA4_E3\DOA4_Retail_Native\out\build\win-amd64-relwithdebinfo-lean\sdk-bin\rexgluerd.exe" }
 foreach($b in $bins){ if(-not (Test-Path $b)){ throw "missing $b" }; Copy-Item $b $dest -Force }
 # Source tree needed for the recompile step (codegen + cmake build).
 # No game data, no generated/ (produced by codegen from the user's own dump).
