@@ -30,14 +30,19 @@ Docs: [architecture](docs/architecture.md) ·
 
 ## For developers
 
-Toolkit: **ReXGlue SDK 0.10.0** with FidelityFX enabled
-(`REXGLUE_ENABLE_FIDELITYFX=ON`). Point `REXSDK_DIR` at your local SDK
-checkout (the SDK is not vendored here):
+Toolkit: **ReXGlue SDK** (vendored as a git submodule, see
+`thirdparty/NOTICE.md` for upstream credit), with FidelityFX enabled
+(`REXGLUE_ENABLE_FIDELITYFX=ON`). The build defaults `REXSDK_DIR` to
+`thirdparty/rexglue-sdk` when present; clone with submodules:
 
 ```bat
-cmake --preset win-amd64-relwithdebinfo-lean -DREXSDK_DIR=<path-to-rexglue-sdk>
+git clone --recurse-submodules https://github.com/lmaogoodcodenotreally/DOA4-recomp.git
+cmake --preset win-amd64-relwithdebinfo-lean
 cmake --build --preset win-amd64-relwithdebinfo-lean
 ```
+
+An explicit `-DREXSDK_DIR=<path-to-rexglue-sdk>` still overrides the
+vendored copy.
 
 Then run the SDK codegen against **your** `assets/game/doa4.xex` (USA Rev 1,
 `default.xex` 16,465,920 bytes) with `doa4retail_manifest.toml` to regenerate

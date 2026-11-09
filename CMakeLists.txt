@@ -8,6 +8,13 @@ project(doa4retail LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Use the vendored ReXGlue SDK (git submodule, see thirdparty/NOTICE.md)
+# when present; an explicit -DREXSDK_DIR still overrides it.
+if(NOT REXSDK_DIR AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/rexglue-sdk/CMakeLists.txt")
+    set(REXSDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/rexglue-sdk" CACHE PATH
+        "Path to rexglue-sdk source tree (vendored submodule)")
+endif()
+
 include(generated/rexglue.cmake)
 
 # Sources

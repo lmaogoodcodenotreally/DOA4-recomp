@@ -2,12 +2,15 @@
 
 ## Overview
 
-DOA4-recomp is a native port built on **ReXGlue SDK 0.10.0** (with
-FidelityFX enabled). The game-side entry point is `src/main.cpp`; the app
-class is `src/doa4retail_app.h` (`rex::ReXApp`). Hooks live in one file per
-concern under `src/` and are listed in `CMakeLists.txt`. Codegen output
-(`generated/doa4/`) is produced locally from the user's own dump and never
-shipped; `doa4retail_manifest.toml` carries only function addresses/sizes.
+DOA4-recomp is a native port built on **ReXGlue SDK** (with FidelityFX
+enabled), vendored as a git submodule at `thirdparty/rexglue-sdk`
+(upstream: <https://github.com/rexglue/rexglue-sdk>; fork branch
+`doa4-native`; see `thirdparty/NOTICE.md`). The game-side entry point is
+`src/main.cpp`; the app class is `src/doa4retail_app.h` (`rex::ReXApp`).
+Hooks live in one file per concern under `src/` and are listed in
+`CMakeLists.txt`. Codegen output (`generated/doa4/`) is produced locally
+from the user's own dump and never shipped;
+`doa4retail_manifest.toml` carries only function addresses/sizes.
 
 See [hooks.md](hooks.md) for per-hook design notes and
 [debug.md](debug.md) for the dev-only tooling.
