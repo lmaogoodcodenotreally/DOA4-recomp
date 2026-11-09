@@ -21,6 +21,11 @@ $bins=@(
 if (Test-Path "$lean\sdk-bin\rexgluerd.exe") { $bins += "$lean\sdk-bin\rexgluerd.exe" }
 if (Test-Path "G:\Games\DOA4_E3\DOA4_Retail_Native\out\build\win-amd64-relwithdebinfo-lean\sdk-bin\rexgluerd.exe") { $bins += "G:\Games\DOA4_E3\DOA4_Retail_Native\out\build\win-amd64-relwithdebinfo-lean\sdk-bin\rexgluerd.exe" }
 foreach($b in $bins){ if(-not (Test-Path $b)){ throw "missing $b" }; Copy-Item $b $dest -Force }
+# Runtime DLLs required next to rexgluerd.exe (it imports rexruntimerd.dll)
+foreach($d in @("rexruntimerd.dll","rexgpu-xenosrd.dll","amd_fidelityfx_dx12drel.dll","TracyClientrd.dll")) {
+  $src = @("$lean\$d","$lean\sdk-bin\$d","G:\Games\DOA4_E3\DOA4_Retail_Native\out\build\win-amd64-relwithdebinfo-lean\$d","G:\Games\DOA4_E3\DOA4_Retail_Native\out\build\win-amd64-relwithdebinfo-lean\sdk-bin\$d") | Where-Object { Test-Path $_ } | Select-Object -First 1
+  if ($src) { Copy-Item $src $dest -Force }
+}
 # Source tree needed for the recompile step (codegen + cmake build).
 # No game data, no generated/ (produced by codegen from the user's own dump).
 foreach($f in @("doa4retail_manifest.toml","CMakeLists.txt","CMakePresets.json")) { Copy-Item "$repo\$f" $dest -Force }

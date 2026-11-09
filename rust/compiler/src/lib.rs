@@ -154,12 +154,25 @@ pub fn recompile(app_dir: &Path) -> Result<PathBuf, String> {
     let out = app_dir.join("out/build/win-amd64-relwithdebinfo-lean/doa4retail.exe");
     if !out.exists() { return Err("cmake build did not produce doa4retail.exe".into()); }
     std::fs::copy(&out, app_dir.join("doa4retail.exe")).map_err(|e| e.to_string())?;
-    // Copy runtime DLLs built alongside the exe so it can launch.
-    for dll in ["rexruntimerd.dll", "rexgpu-xenosrd.dll", "amd_fidelityfx_dx12drel.dll"] {
-        let src = app_dir.join("out/build/win-amd64-relwithdebinfo-lean").join(dll);
-        if src.exists() { let _ = std::fs::copy(&src, app_dir.join(dll)); }
-        let src2 = app_dir.join("out/build/win-amd64-relwithdebinfo-lean/sdk-bin").join(dll);
-        if src2.exists() { let _ = std::fs::copy(&src2, app_dir.join(dll)); }
+    // Copy runtime DLLs built alongside the exe so it can launch (all locations).
+    for dll in ["rexruntimerd.dll", "rexgpu-xenosrd.dll", "amd_fidelityfx_dx12drel.dll", "TracyClientrd.dll"] {
+        for base in ["out/build/win-amd64-relwithdebinfo-lean", "out/build/win-amd64-relwithdebinfo-lean/sdk-bin", "out/build/win-amd64-relwithdebinfo-lean/ffx-bin", "out/build/win-amd64-relwithdebinfo-lean/rexglue-sdk"] {
+            let src = app_dir.join(base).join(dll);
+            if src.exists() { let _ = std::fs::copy(&src, app_dir.join(dll)); break; }
+        }
+    }
+    // Amd fidelityfx lives in ffx-bin under cmake _deps; copy any matching DLL from the build tree.
+    let build = app_dir.join("out/build/win-amd64-relwithdebinfo-lean");
+    if build.exists() {
+        for e in std::fs::read_dir(&build).into_iter().flatten().flatten() {
+            let p = e.path();
+            if p.is_dir() && p.file_name().map(|n| n.to_string_lossy().contains("amd")).unwrap_or(false) {
+                for f in std::fs::read_dir(&p).into_iter().flatten().flatten() {
+                    let pp = f.path();
+                    if pp.extension().map(|x| x == "dll").unwrap_or(false) { let _ = std::fs::copy(&pp, app_dir.join(pp.file_name().unwrap())); }
+                }
+            }
+        }
     }
     Ok(app_dir.join("doa4retail.exe"))
 }
