@@ -32,6 +32,8 @@ jobs:
           Copy-Item doa4retail_manifest.toml canned_manifest.tmp
           Copy-Item src $dest -Recurse -Force
           robocopy thirdparty "$dest/thirdparty" /E /NFL /NDL /NJH /NJS | Out-Null
+          # robocopy returns 1 on successful copy - ignore its exit code
+          $global:LASTEXITCODE = 0
           Copy-Item .gitmodules $dest -Force
           Copy-Item doa4retail_manifest.toml "$dest/saved_manifest.txt" -Force
           # Default game config
