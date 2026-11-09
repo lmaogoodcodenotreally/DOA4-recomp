@@ -70,15 +70,21 @@ pub fn refresh_path() {
 
 pub fn extract(iso: &Path, app_dir: &Path) -> Result<PathBuf, String> {
     let game = app_dir.join("game");
+    if game.exists() { std::fs::remove_dir_all(&game).map_err(|e| e.to_string())?; }
     std::fs::create_dir_all(&game).map_err(|e| e.to_string())?;
     if iso.extension().map(|e| e.eq_ignore_ascii_case("xex")).unwrap_or(false) {
         let meta = std::fs::metadata(iso).map_err(|e| e.to_string())?;
         if meta.len() != 16465920 { return Err(format!("Unexpected XEX size {} (expected US Rev 1 default.xex 16465920)", meta.len())); }
         std::fs::copy(iso, game.join("default.xex")).map_err(|e| e.to_string())?;
     } else {
-        let z = find_beside_or_path(app_dir, "7z.exe").or_else(|| find_beside_or_path(app_dir, "extract-xiso.exe"))
-            .ok_or("7z.exe or extract-xiso.exe not found")?;
-        let st = Command::new(z).arg("x").arg(iso).arg(format!("-o{}", game.display())).arg("-y").output().map_err(|e| e.to_string())?;
+        // Xbox XISO (VIDEO/VIDEO_TS UDF head): extract-xiso is required; 7-Zip alone mis-reads it.
+        let xiso = find_beside_or_path(app_dir, "extract-xiso.exe");
+        let z = find_beside_or_path(app_dir, "7z.exe");
+        let st = if let Some(x) = xiso {
+            Command::new(x).current_dir(app_dir).args(["-x", "-d", "game"]).arg(iso).output().map_err(|e| e.to_string())?
+        } else if let Some(z2) = z {
+            Command::new(z2).arg("x").arg(iso).arg(format!("-o{}", game.display())).arg("-y").output().map_err(|e| e.to_string())?
+        } else { return Err("extract-xiso.exe (bundled) or 7z.exe not found".into()) };
         if !st.status.success() { return Err(format!("extractor failed: {}", String::from_utf8_lossy(&st.stderr))); }
         // flatten one wrapper level
         fn find_xex(d: &Path) -> Option<PathBuf> {
@@ -113,10 +119,31 @@ pub fn recompile(app_dir: &Path) -> Result<PathBuf, String> {
         let rex = [
             app_dir.join("out/build/rexglue-sdk/rexglue.exe"),
             app_dir.join("thirdparty/rexglue-sdk/build/rexglue.exe"),
+            app_dir.join("rexgluerd.exe"),
+            app_dir.join("rexglue.exe"),
+            app_dir.join("out/build/win-amd64-relwithdebinfo-lean/sdk-bin/rexgluerd.exe"),
         ].into_iter().find(|p| p.exists())
+            .or_else(|| find_beside_or_path(app_dir, "rexgluerd.exe"))
             .or_else(|| find_beside_or_path(app_dir, "rexglue.exe"))
-            .ok_or("rexglue.exe not found. Build the SDK first")?;
-        let st = Command::new(rex).current_dir(app_dir).args(["codegen", "--config"]).arg(app_dir.join("doa4retail_manifest.toml")).output().map_err(|e| e.to_string())?;
+            .ok_or("rexglue.exe / rexgluerd.exe not found. Build the SDK first")?;
+        // New rexglue (v0.10.1+) expects manifest from `init`. Our shipped
+        // manifest carries hand-resolved [entrypoint.functions]; if codegen
+        // rejects it, init a fresh shell, re-append those entries (after the
+        // [entrypoint] block, as [entrypoint.functions] + auto-generated stubs),
+        // then run codegen with the manifest path passed explicitly.
+        let mut st = Command::new(&rex).current_dir(app_dir).args(["codegen"]).arg(app_dir.join("doa4retail_manifest.toml")).output().map_err(|e| e.to_string())?;
+        if !gen.join("sources.cmake").exists() {
+            let shipped = std::fs::read_to_string(app_dir.join("saved_manifest.txt")).unwrap_or_default();
+            let init = Command::new(&rex).current_dir(app_dir).args(["init", "--force", "--project-name", "doa4retail", "--xex-path", "assets/game/doa4.xex", "--game-root", "assets/game"]).output().map_err(|e| e.to_string())?;
+            if !init.status.success() { return Err(format!("codegen init failed: {}", String::from_utf8_lossy(&init.stderr))); }
+            if !shipped.is_empty() {
+                let extras: Vec<String> = shipped.lines().skip(11).map(|s| s.to_string()).collect();
+                let mut cur = std::fs::read_to_string(app_dir.join("doa4retail_manifest.toml")).unwrap_or_default().replace("\r\n", "\n");
+                cur.push_str(&extras.join("\n")); cur.push('\n');
+                std::fs::write(app_dir.join("doa4retail_manifest.toml"), cur).map_err(|e| e.to_string())?;
+            }
+            st = Command::new(&rex).current_dir(app_dir).args(["codegen"]).arg(app_dir.join("doa4retail_manifest.toml")).output().map_err(|e| e.to_string())?;
+        }
         if !gen.exists() { return Err(format!("codegen failed: {}", String::from_utf8_lossy(&st.stderr))); }
     }
     let cmake = find_beside_or_path(app_dir, "cmake.exe").ok_or("cmake not found on PATH")?;

@@ -1,5 +1,10 @@
 # Third-party attribution
 
+## extract-xiso (bundled binary `tools/extract-xiso.exe`)
+
+Built from <https://github.com/XboxDev/extract-xiso> v2.7.1 (in@fishtank.com),
+BSD-style Free license, see `tools/extract-xiso-LICENSE.txt`.
+
 ## ReXGlue SDK (vendored as git submodule)
 
 `thirdparty/rexglue-sdk` is a git submodule pinned to the **doa4-native**

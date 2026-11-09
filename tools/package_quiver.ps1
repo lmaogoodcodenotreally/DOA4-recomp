@@ -15,9 +15,22 @@ $bins=@(
   "$lbt\DOA4Launcher.exe",
   "$lbt\DOA4Launcher-tui.exe",
   "$cbt\compiler.exe",
-  "$cbt\compiler-tui.exe"
+  "$cbt\compiler-tui.exe",
+  "$repo\tools\extract-xiso.exe"
 )
+# Optional codegen tool (rexgluerd.exe) from the dev lean build, if present
+if (Test-Path "$lean\sdk-bin\rexgluerd.exe") { $bins += "$lean\sdk-bin\rexgluerd.exe" }
 foreach($b in $bins){ if(-not (Test-Path $b)){ throw "missing $b" }; Copy-Item $b $dest -Force }
+# Source tree needed for the recompile step (codegen + cmake build).
+# No game data, no generated/ (produced by codegen from the user's own dump).
+foreach($f in @("doa4retail_manifest.toml","CMakeLists.txt","CMakePresets.json")) { Copy-Item "$repo\$f" $dest -Force }
+Copy-Item "$repo\src" $dest -Recurse -Force
+Copy-Item "$repo\thirdparty" $dest -Recurse -Force
+Copy-Item "$repo\.gitmodules" $dest -Force
+# saved_manifest.txt is needed by compiler for codegen fallback; keep .txt so rexglue auto-discovery (which globs *_manifest.toml) ignores it.
+Copy-Item "$repo\doa4retail_manifest.toml" "$dest\saved_manifest.txt" -Force
+# Ensure only .txt ships, not stale .toml
+Remove-Item "$dest\saved_manifest.toml" -Force -ErrorAction SilentlyContinue
 @'
 game_data_root = "game"
 gpu_plugin = "xenos"
