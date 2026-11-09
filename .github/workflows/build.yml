@@ -1,0 +1,12 @@
+name: build
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '10.0.x' }
+      - run: dotnet publish launcher/Doa4Launcher.csproj -c Release
+      - run: dotnet publish compiler/Doa4Compiler.csproj -c Release
+      - run: dir launcher/publish, compiler/publish

@@ -1,0 +1,28 @@
+# DOA4-recomp public repo - never ship assets or generated game code.
+# Game binary input (user-provided USA Rev 1 dump) - lives only on the user's disk.
+/assets/
+*.xex
+*.xiso
+*.iso
+*.img
+*.7z
+*.tar
+*.zip
+
+# ReXGlue codegen output - decompiled from the user's own dump, do not publish.
+/generated/
+/out/
+bin/
+obj/
+publish/
+
+# Local runtime artifacts
+*.log
+*.csv
+*.pdb
+*.i64
+launcher.json
+doa4retail.toml
+CMakeUserPresets.json
+Thumbs.db
+.env*
