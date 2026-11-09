@@ -6,6 +6,12 @@ impl App { fn new() -> Self { Self { src: String::new(), status: "Pick USA Rev 1
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Drag & drop: files dropped on the window fill the ISO path.
+        ctx.input(|i| {
+            for f in &i.raw.dropped_files {
+                if let Some(p) = &f.path { self.src = p.display().to_string(); self.status = format!("Dropped: {}", p.display()); }
+            }
+        });
         let app_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf())).unwrap_or_default();
         let missing = doa4_compiler::check_requirements(&app_dir);
         if !missing.is_empty() && self.missing.is_empty() {
@@ -22,13 +28,19 @@ impl eframe::App for App {
                 ui.label("ISO / XISO");
                 ui.add(egui::TextEdit::singleline(&mut self.src).desired_width(420.0));
             });
-            ui.label("Tip: paste the ISO path, then Extract + Recompile.");
+            ui.label("Tip: drag & drop the ISO onto this window, or paste the ISO path, then Extract + Recompile.");
             ui.label(&self.status);
-            if ui.button("Install missing requirements").clicked() {
-                self.status = "Installing...".into();
-                for r in doa4_compiler::check_requirements(&app_dir) { let _ = doa4_compiler::install_requirement(&r); }
-                self.status = "Install step done. Restart compiler.exe so PATH updates.".into();
-            }
+            ui.horizontal(|ui| {
+                if ui.button("Yes, install missing").clicked() {
+                    self.status = "Installing with winget...".into();
+                    for r in doa4_compiler::check_requirements(&app_dir) { let _ = doa4_compiler::install_requirement(&r); }
+                    doa4_compiler::refresh_path();
+                    self.status = "Install step done. Restart compiler.exe so PATH updates.".into();
+                }
+                if ui.button("No, skip install").clicked() {
+                    self.status = "Skipping install.".into();
+                }
+            });
             if ui.button("Extract + Recompile").clicked() {
                 self.status = "Extracting...".into();
                 match doa4_compiler::extract(std::path::Path::new(&self.src), &app_dir) {

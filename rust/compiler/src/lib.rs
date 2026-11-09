@@ -15,9 +15,23 @@ pub fn requirements() -> Vec<Req> {
 pub fn find_beside_or_path(app_dir: &Path, name: &str) -> Option<PathBuf> {
     let beside = app_dir.join(name);
     if beside.exists() { return Some(beside); }
-    for cand in [r"C:\Program Files\7-Zip", r"C:\Program Files (x86)\7-Zip"] {
+    for cand in [
+        r"C:\Program Files\7-Zip", r"C:\Program Files (x86)\7-Zip",
+        r"C:\Program Files\CMake\bin", r"C:\Program Files (x86)\CMake\bin",
+        r"C:\Program Files\LLVM\bin", r"C:\Program Files (x86)\LLVM\bin",
+        r"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja",
+        r"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
+    ] {
         let p = Path::new(cand).join(name);
         if p.exists() { return Some(p); }
+    }
+    // Bundled tools under VS BuildTools (CMake ships Ninja inside)
+    for base in [r"C:\Program Files\Microsoft Visual Studio", r"C:\Program Files (x86)\Microsoft Visual Studio"] {
+        if Path::new(base).exists() {
+            for entry in walkdir_shallow(Path::new(base), 6) {
+                if entry.file_name().map(|n| n == name).unwrap_or(false) { return Some(entry); }
+            }
+        }
     }
     for dir in std::env::var("PATH").unwrap_or_default().split(';') {
         let p = Path::new(dir.trim_matches('"')).join(name);
@@ -26,12 +40,32 @@ pub fn find_beside_or_path(app_dir: &Path, name: &str) -> Option<PathBuf> {
     None
 }
 
+fn walkdir_shallow(d: &Path, depth: usize) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    if depth == 0 || !d.is_dir() { return out; }
+    for e in std::fs::read_dir(d).into_iter().flatten().flatten() {
+        let p = e.path();
+        if p.is_dir() { out.extend(walkdir_shallow(&p, depth - 1)); } else { out.push(p); }
+    }
+    out
+}
+
+pub fn version_works(path: &Path, flag: &str) -> bool {
+    Command::new(path).arg(flag).output().map(|o| o.status.success()).unwrap_or(false)
+}
+
 pub fn check_requirements(app_dir: &Path) -> Vec<Req> {
     requirements().into_iter().filter(|r| find_beside_or_path(app_dir, r.exe).is_none()).collect()
 }
 
 pub fn install_requirement(r: &Req) -> std::io::Result<std::process::ExitStatus> {
     Command::new("winget").args(["install", "--id", r.winget, "-e", "--accept-source-agreements", "--accept-package-agreements"]).status()
+}
+pub fn refresh_path() {
+    let mut dirs = vec![r"C:\Program Files\7-Zip".to_string(), r"C:\Program Files\CMake\bin".to_string(), r"C:\Program Files\LLVM\bin".to_string()];
+    dirs.push(r"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja".to_string());
+    let cur = std::env::var("PATH").unwrap_or_default();
+    std::env::set_var("PATH", format!("{};{}", dirs.join(";"), cur));
 }
 
 pub fn extract(iso: &Path, app_dir: &Path) -> Result<PathBuf, String> {

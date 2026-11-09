@@ -22,7 +22,7 @@ fn main() {
     let iso = if let Some(i) = args.iter().position(|a| a == "--iso") { args.get(i+1).cloned() } else { None };
     let iso = match iso {
         Some(s) => s,
-        None => { print!("ISO/XISO path: "); io::stdout().flush().ok(); let mut s = String::new(); io::stdin().read_line(&mut s).ok(); s.trim().to_string() }
+        None => { println!("Drag the ISO file into this window, or type/paste the path, then Enter."); print!("ISO/XISO path: "); io::stdout().flush().ok(); let mut s = String::new(); io::stdin().read_line(&mut s).ok(); s.trim().trim_matches('"').trim_matches('\'').to_string() }
     };
     match doa4_compiler::extract(std::path::Path::new(&iso), &dir) {
         Ok(_) => { println!("Extracted. Recompiling..."); match doa4_compiler::recompile(&dir) { Ok(_) => println!("Done. Run DOA4Launcher.exe."), Err(e) => { eprintln!("Recompile failed: {e}"); std::process::exit(1); } } }
