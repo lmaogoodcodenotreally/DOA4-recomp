@@ -14,9 +14,12 @@ Docs: [architecture](docs/architecture.md) ·
 ## For players (Quiver)
 
 1. Install from Quiver (or unzip the release zip anywhere).
-2. Run `compiler.exe` and pick your own USA Rev 1 ISO/XISO.
-   It extracts `game\` (`default.xex` + `*.afs`) beside the exe.
-3. Run `DOA4Launcher.exe` to set display/graphics/input, then **Launch**.
+2. Run `compiler.exe` (GUI) or `compiler-tui.exe` (TUI) and pick your own
+   USA Rev 1 ISO/XISO. It checks/installs 7-Zip/CMake/Ninja/LLVM if missing
+   (Yes/No), extracts `game\` (`default.xex` + `*.afs`) and recompiles
+   (rexglue codegen + cmake build), beside the exe.
+3. Run `DOA4Launcher.exe` (GUI) or `DOA4Launcher-tui.exe` (TUI) to set
+   display/graphics/input, then **Launch**.
 
 ### Extra features (launcher `Settings.cs`)
 
@@ -49,8 +52,8 @@ Then run the SDK codegen against **your** `assets/game/doa4.xex` (USA Rev 1,
 `generated/doa4/` locally — that output stays ignored.
 
 ```bat
-dotnet publish compiler\Doa4Compiler.csproj -c Release
-dotnet publish launcher\Doa4Launcher.csproj -c Release
+cargo build --release --manifest-path rust\compiler\Cargo.toml
+cargo build --release --manifest-path rust\launcher\Cargo.toml
 powershell tools\package_quiver.ps1
 ```
 

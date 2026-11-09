@@ -1,0 +1,20 @@
+[package]
+name = "doa4-launcher"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "DOA4Launcher"
+path = "src/bin/DOA4Launcher.rs"
+
+[[bin]]
+name = "DOA4Launcher-tui"
+path = "src/bin/DOA4Launcher_tui.rs"
+
+[dependencies]
+eframe = "0.31"
+egui = "0.31"
+ratatui = "0.29"
+crossterm = "0.28"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

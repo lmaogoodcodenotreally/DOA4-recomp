@@ -12,9 +12,14 @@
 # ReXGlue codegen output - decompiled from the user's own dump, do not publish.
 /generated/
 /out/
-bin/
-obj/
+# Rust targets (sources stay tracked)
+target/
+!src/bin/
+# C++ build artifacts (legacy)
+/bin/
+/obj/
 publish/
+target/
 
 # Local runtime artifacts
 *.log

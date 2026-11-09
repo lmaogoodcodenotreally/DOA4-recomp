@@ -1,0 +1,18 @@
+[package]
+name = "doa4-compiler"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "compiler"
+path = "src/bin/compiler.rs"
+
+[[bin]]
+name = "compiler-tui"
+path = "src/bin/compiler_tui.rs"
+
+[dependencies]
+eframe = "0.31"
+egui = "0.31"
+ratatui = "0.29"
+crossterm = "0.28"
