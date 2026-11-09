@@ -1,6 +1,6 @@
 # DOA4-recomp
 
-Work in progress native (ReXGlue / Recomp) port of Dead Or Alive 4 (USA, Rev 1), packaged for
+Work in progress, heavily AI assisted native (ReXGlue / Recomp) port of Dead Or Alive 4 (USA, Rev 1), packaged for
 [Quiver Launcher](https://github.com/tgeorgiadis/quiver-launcher): Quiver
 downloads the GitHub release zip, runs `compiler.exe`, then the game.
 
