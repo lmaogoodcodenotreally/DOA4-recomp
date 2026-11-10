@@ -35,7 +35,9 @@ jobs:
           submodules: recursive
           fetch-depth: 0   # rex_compute_version needs tags
       - uses: dtolnay/rust-toolchain@stable
-      - uses: seanmiddleditch/gha-setup-ninja@v5
+      # choco is preinstalled on the Windows runners; avoids depending on a
+      # third-party action for something this small.
+      - run: choco install ninja -y --no-progress
 
       - name: Build the SDK (codegen tool + runtime DLLs)
         run: >
