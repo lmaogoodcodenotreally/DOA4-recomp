@@ -46,13 +46,13 @@ for the current state id, installable game-agnostically from the app.
 
 ## Detector / packaging layout
 
-- Release zip (via `tools/package_quiver.ps1`): the launcher and compiler
+- Release zip (via `tools/package_release.ps1`): the launcher and compiler
   (GUI + TUI), `extract-xiso.exe`, the `rexgluerd.exe` codegen tool and its
   runtime DLLs, the `src/` + `thirdparty/rexglue-sdk` sources the build needs,
   and a `doa4retail.toml` template. **No `doa4retail.exe` and no `game\`
   data** - the game binary is built on the player's machine by `compiler.exe`,
   because codegen needs their own dump as input.
-- `compiler.exe` (Quiver first step): user picks their own USA Rev 1
+- `compiler.exe` (the player's first step): user picks their own USA Rev 1
   ISO/XISO; the tool extracts `game\` (`default.xex` + `*.afs`) beside the
   exe, runs codegen, then the CMake build. It never downloads game data.
   Every child process is streamed to `compiler.log`; progress comes from

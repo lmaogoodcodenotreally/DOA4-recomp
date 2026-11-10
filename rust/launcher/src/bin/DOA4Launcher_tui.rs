@@ -1,19 +1,53 @@
 // DOA4Launcher (console).
-//   DOA4Launcher-tui                 interactive: list settings, change, launch
-//   DOA4Launcher-tui --launch        launch with the saved settings
-//   DOA4Launcher-tui --set k=v ...   change settings and save (no launch)
-//   DOA4Launcher-tui --list          print the settings and exit
+//   DOA4Launcher-tui                  interactive: list settings, change, launch
+//   DOA4Launcher-tui --launch         launch with the saved settings
+//   DOA4Launcher-tui --set k=v ...    change settings and save (no launch)
+//   DOA4Launcher-tui --preset <name>  apply a graphics preset and save
+//   DOA4Launcher-tui --list           print the settings, with explanations
 use doa4_launcher::*;
 use std::io::{self, Write};
 use std::path::Path;
 
-fn show(cfg: &Config) {
+/// Wrap `text` to `width` columns, indenting every line by `indent` spaces.
+fn wrap(text: &str, width: usize, indent: usize) -> Vec<String> {
+    let pad = " ".repeat(indent);
+    let mut lines = Vec::new();
+    let mut line = String::new();
+    for word in text.split_whitespace() {
+        if !line.is_empty() && line.chars().count() + 1 + word.chars().count() > width {
+            lines.push(format!("{pad}{line}"));
+            line.clear();
+        }
+        if !line.is_empty() { line.push(' '); }
+        line.push_str(word);
+    }
+    if !line.is_empty() { lines.push(format!("{pad}{line}")); }
+    lines
+}
+
+fn show(cfg: &Config, with_help: bool) {
     for (group, items) in [("Display", display()), ("Graphics", graphics()), ("Input", input())] {
-        println!("\n{group}");
+        if group == "Graphics" {
+            let name = active_preset(cfg).unwrap_or("Custom");
+            println!("\n{group}  [preset: {name}]");
+        } else {
+            println!("\n{group}");
+        }
         for s in items {
             let v = cfg.game.get(s.key).cloned().unwrap_or_else(|| s.default.to_string());
-            let pretty = s.choices.iter().find(|(val, _)| *val == v).map(|(_, t)| *t).unwrap_or(&v);
-            println!("  {:<48} {:<10} {}", s.key, v, pretty);
+            let on_off = if v == "true" { "on" } else { "off" };
+            let pretty = s.choices.iter().find(|(val, _)| *val == v).map(|(_, t)| *t)
+                .unwrap_or(if s.kind == Kind::Bool { on_off } else { &v });
+            let tag = if s.advanced { " [advanced]" } else { "" };
+            println!("  {:<38} {:<8} {}{}", s.key, v, pretty, tag);
+            if with_help {
+                for l in wrap(s.help, 72, 6) { println!("{l}"); }
+                if !s.choices.is_empty() {
+                    let opts: Vec<&str> = s.choices.iter().map(|(val, _)| *val).collect();
+                    for l in wrap(&format!("choices: {}", opts.join(", ")), 72, 6) { println!("{l}"); }
+                }
+                println!();
+            }
         }
     }
 }
@@ -47,7 +81,34 @@ fn main() {
     if cfg.data_root.is_empty() { cfg.data_root = data; }
     for s in all() { cfg.game.entry(s.key.to_string()).or_insert(s.default.to_string()); }
 
-    if has("--list") { show(&cfg); return; }
+    if has("--list") { show(&cfg, true); return; }
+
+    if let Some(i) = args.iter().position(|a| a == "--preset") {
+        match args.get(i + 1) {
+            Some(name) => {
+                let found = presets().iter().find(|p| p.name.eq_ignore_ascii_case(name));
+                match found {
+                    Some(p) => {
+                        apply_preset(&mut cfg, p.name);
+                        save_cfg(&dir, &cfg);
+                        println!("{} preset applied and saved.", p.name);
+                    }
+                    None => {
+                        eprintln!("No such preset: {name}");
+                        eprintln!("Available: {}",
+                            presets().iter().map(|p| p.name).collect::<Vec<_>>().join(", "));
+                        std::process::exit(2);
+                    }
+                }
+            }
+            None => {
+                eprintln!("--preset needs a name. Available: {}",
+                    presets().iter().map(|p| p.name).collect::<Vec<_>>().join(", "));
+                std::process::exit(2);
+            }
+        }
+        if !has("--launch") { return; }
+    }
 
     // --set k=v [k=v ...]
     if let Some(i) = args.iter().position(|a| a == "--set") {
@@ -71,8 +132,8 @@ fn main() {
 
     if !has("--launch") {
         println!("DOA4 launcher. Settings live in {}", dir.join("launcher.json").display());
-        show(&cfg);
-        println!("\nType  key=value  to change one, 'l' to launch, Enter to quit.");
+        show(&cfg, false);
+        println!("\nType  key=value  to change one, a preset name (Performance / Balanced / Quality),\n'list' to re-show, 'help' for what each one does, 'l' to launch, Enter to quit.");
         loop {
             print!("> ");
             io::stdout().flush().ok();
@@ -86,7 +147,14 @@ fn main() {
             match line {
                 "" => { save_cfg(&dir, &cfg); return; }
                 "l" | "launch" => break,
-                "list" => show(&cfg),
+                "list" => show(&cfg, false),
+                "help" => show(&cfg, true),
+                _ if presets().iter().any(|p| p.name.eq_ignore_ascii_case(line)) => {
+                    let name = presets().iter().find(|p| p.name.eq_ignore_ascii_case(line)).unwrap().name;
+                    apply_preset(&mut cfg, name);
+                    save_cfg(&dir, &cfg);
+                    println!("{name} preset applied.");
+                }
                 _ => {
                     if set(&mut cfg, line) { save_cfg(&dir, &cfg); println!("ok"); }
                     else { println!("not a setting: {line}   (type 'list')"); }

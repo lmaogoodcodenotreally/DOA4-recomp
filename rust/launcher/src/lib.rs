@@ -3,42 +3,201 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 #[derive(Debug, Clone)]
-pub struct Setting { pub key: &'static str, pub kind: Kind, pub default: &'static str, pub label: &'static str, pub choices: Vec<(&'static str, &'static str)> }
+pub struct Setting {
+    pub key: &'static str,
+    pub kind: Kind,
+    pub default: &'static str,
+    pub label: &'static str,
+    /// One or two plain sentences for a player who has never seen this cvar.
+    /// Shown as a tooltip in the GUI and by `--list` in the console launcher.
+    pub help: &'static str,
+    pub choices: Vec<(&'static str, &'static str)>,
+    /// Hidden behind "Advanced" in the GUI: useful, but not a first-run choice.
+    pub advanced: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Kind { Bool, Int, Double, Str }
 
+fn setting(
+    key: &'static str, kind: Kind, default: &'static str, label: &'static str,
+    help: &'static str, choices: &[(&'static str, &'static str)],
+) -> Setting {
+    Setting { key, kind, default, label, help, choices: choices.to_vec(), advanced: false }
+}
+
+fn advanced(
+    key: &'static str, kind: Kind, default: &'static str, label: &'static str,
+    help: &'static str, choices: &[(&'static str, &'static str)],
+) -> Setting {
+    Setting { advanced: true, ..setting(key, kind, default, label, help, choices) }
+}
+
 pub fn display() -> Vec<Setting> {
     vec![
-        Setting{key:"fullscreen",kind:Kind::Bool,default:"true",label:"Fullscreen",choices:vec![]},
-        Setting{key:"monitor",kind:Kind::Int,default:"0",label:"Monitor",choices:vec![("0","Default"),("1","Monitor 1"),("2","Monitor 2"),("3","Monitor 3")]},
-        Setting{key:"window_width",kind:Kind::Int,default:"0",label:"Window width",choices:vec![]},
-        Setting{key:"window_height",kind:Kind::Int,default:"0",label:"Window height",choices:vec![]},
-        Setting{key:"aspect_ratio",kind:Kind::Double,default:"-1",label:"Aspect ratio",choices:vec![("-1","Auto"),("0","16:9"),("1.333333","4:3"),("1.6","16:10"),("2.370370","21:9 2560x1080"),("2.388889","21:9 3440x1440"),("2.4","21:9 3840x1600"),("3.555556","32:9")]},
-        Setting{key:"present_letterbox",kind:Kind::Bool,default:"false",label:"Keep 16:9 (letterbox)",choices:vec![]},
-        Setting{key:"frame_interp",kind:Kind::Bool,default:"false",label:"Frame interpolation (experimental)",choices:vec![]},
-        Setting{key:"d3d12_allow_variable_refresh_rate_and_tearing",kind:Kind::Bool,default:"false",label:"Screen sync",choices:vec![("false","V-Sync"),("true","Off (tearing)")]},
+        setting("fullscreen", Kind::Bool, "true", "Fullscreen",
+            "Fill the selected monitor. Turn this off to play in a resizable window.", &[]),
+        setting("monitor", Kind::Int, "0", "Monitor",
+            "Which monitor to open on. Default follows the primary monitor Windows is set to.",
+            &[("0", "Default"), ("1", "Monitor 1"), ("2", "Monitor 2"), ("3", "Monitor 3")]),
+        setting("aspect_ratio", Kind::Double, "-1", "Aspect ratio",
+            "Shape of the 3D camera. Auto matches the game window, so an ultrawide display fills \
+             edge to edge instead of showing a 16:9 image with black bars at the sides. Only takes \
+             effect with \"Keep 16:9\" turned off.",
+            &[("-1", "Auto (match the window)"), ("0", "16:9 (game default)"), ("1.333333", "4:3"),
+              ("1.6", "16:10"), ("2.370370", "21:9 (2560x1080)"), ("2.388889", "21:9 (3440x1440)"),
+              ("2.4", "21:9 (3840x1600)"), ("3.555556", "32:9")]),
+        setting("present_letterbox", Kind::Bool, "false", "Keep 16:9 (letterbox)",
+            "Pad the picture out to 16:9 with black bars instead of filling the screen. Leave this \
+             off for widescreen; turn it on if you want the original framing exactly.", &[]),
+        setting("frame_interp", Kind::Bool, "false", "Frame interpolation",
+            "Experimental. Inserts generated in-between frames for roughly double the visual \
+             smoothness. The game's own logic still runs at 60 Hz, and fast motion can show \
+             artefacts, so turn it off again if anything looks wrong.", &[]),
+        setting("d3d12_allow_variable_refresh_rate_and_tearing", Kind::Bool, "false", "Screen sync",
+            "V-Sync locks to your monitor and avoids tearing. Off lets the image tear, which is \
+             what you want on a G-Sync or FreeSync display.",
+            &[("false", "V-Sync"), ("true", "Off (tearing / variable refresh)")]),
+        advanced("window_width", Kind::Int, "0", "Window width",
+            "Window width in pixels when not fullscreen. 0 picks a size from the current display mode.", &[]),
+        advanced("window_height", Kind::Int, "0", "Window height",
+            "Window height in pixels when not fullscreen. 0 picks a size from the current display mode.", &[]),
     ]
 }
+
 pub fn graphics() -> Vec<Setting> {
     vec![
-        Setting{key:"resolution_scale",kind:Kind::Int,default:"1",label:"Internal resolution",choices:vec![("1","1x"),("2","2x"),("3","3x"),("4","4x")]},
-        Setting{key:"scaled_point_filter_linear",kind:Kind::Bool,default:"true",label:"Smooth 2D art",choices:vec![]},
-        Setting{key:"swap_post_effect",kind:Kind::Str,default:"none",label:"Anti-aliasing (post)",choices:vec![("none","Off"),("fxaa","FXAA"),("fxaa_extreme","FXAA extreme")]},
-        Setting{key:"native_2x_msaa",kind:Kind::Bool,default:"true",label:"Native 2x MSAA",choices:vec![]},
-        Setting{key:"anisotropic_override",kind:Kind::Int,default:"3",label:"Texture filtering",choices:vec![("-1","Game default"),("0","Off"),("1","1x"),("2","2x"),("3","4x"),("4","8x"),("5","16x")]},
-        Setting{key:"present_effect",kind:Kind::Str,default:"cas",label:"Output scaling",choices:vec![("bilinear","Bilinear"),("cas","CAS"),("fsr","FSR 1"),("fsr2","FSR 2"),("fsr3","FSR 3")]},
+        setting("resolution_scale", Kind::Int, "2", "Internal resolution",
+            "Renders the 3D image at this multiple of the Xbox 360's own resolution and scales it \
+             down, which is the most effective way to sharpen the picture - and the most expensive. \
+             Takes effect after a restart.",
+            &[("1", "1x (as the console)"), ("2", "2x"), ("3", "3x"), ("4", "4x"),
+              ("5", "5x"), ("6", "6x"), ("7", "7x"), ("8", "8x")]),
+        setting("present_effect", Kind::Str, "cas", "Output scaling",
+            "How the finished frame is fitted to your window. CAS sharpens at native size; the FSR \
+             options upscale from a lower internal resolution. Everything except Bilinear needs a \
+             FidelityFX build, which the compiler cannot produce when the install path contains \
+             non-ASCII characters.",
+            &[("bilinear", "Bilinear (plain)"), ("cas", "CAS (sharpen)"), ("fsr", "FSR 1"),
+              ("fsr2", "FSR 2"), ("fsr3", "FSR 3")]),
+        setting("native_2x_msaa", Kind::Bool, "true", "Native 2x MSAA",
+            "Hardware anti-aliasing. Smooths the edges of 3D geometry without blurring textures, \
+             and is usually cheaper than the post-process option below.", &[]),
+        setting("swap_post_effect", Kind::Str, "none", "Anti-aliasing (post)",
+            "Smooths jagged edges after the frame is drawn. Cheap, and catches edges MSAA misses, \
+             but softens the whole image slightly.",
+            &[("none", "Off"), ("fxaa", "FXAA"), ("fxaa_extreme", "FXAA extreme")]),
+        setting("anisotropic_override", Kind::Int, "3", "Texture filtering",
+            "Keeps textures sharp when seen at a steep angle, such as the arena floor. Costs very \
+             little on any modern GPU.",
+            &[("-1", "Game default"), ("0", "Off"), ("1", "1x"), ("2", "2x"), ("3", "4x"),
+              ("4", "8x"), ("5", "16x")]),
+        setting("scaled_point_filter_linear", Kind::Bool, "true", "Smooth 2D art",
+            "Smooths menus and HUD artwork when the internal resolution is above 1x. Turn it off \
+             for a sharper, more pixelated look.", &[]),
+        advanced("draw_resolution_scale_x", Kind::Int, "1", "Render scale X",
+            "Per-axis render scale. Anything above 1 overrides Internal resolution for this axis, \
+             so 3 x 2 renders wider than it does tall. Takes effect after a restart.",
+            &[("1", "1x"), ("2", "2x"), ("3", "3x"), ("4", "4x"), ("5", "5x"), ("6", "6x"), ("7", "7x"), ("8", "8x")]),
+        advanced("draw_resolution_scale_y", Kind::Int, "1", "Render scale Y",
+            "Per-axis render scale. Anything above 1 overrides Internal resolution for this axis. \
+             Takes effect after a restart.",
+            &[("1", "1x"), ("2", "2x"), ("3", "3x"), ("4", "4x"), ("5", "5x"), ("6", "6x"), ("7", "7x"), ("8", "8x")]),
     ]
 }
+
 pub fn input() -> Vec<Setting> {
     vec![
-        Setting{key:"input_backend",kind:Kind::Str,default:"sdl",label:"Controller backend",choices:vec![("sdl","SDL"),("xinput","XInput")]},
-        Setting{key:"mnk_mode",kind:Kind::Bool,default:"true",label:"Keyboard as controller",choices:vec![]},
-        Setting{key:"hid_sdl_directinput",kind:Kind::Bool,default:"false",label:"Legacy DirectInput pads",choices:vec![]},
-        Setting{key:"audio_mute",kind:Kind::Bool,default:"false",label:"Mute audio",choices:vec![]},
-        Setting{key:"skip_intro",kind:Kind::Bool,default:"true",label:"Skip intro",choices:vec![]},
+        setting("input_backend", Kind::Str, "sdl", "Controller backend",
+            "SDL recognises the widest range of controllers. XInput only handles Xbox-style pads \
+             but can be more predictable with them.",
+            &[("sdl", "SDL"), ("xinput", "XInput")]),
+        setting("mnk_mode", Kind::Bool, "true", "Keyboard as controller",
+            "Lets the keyboard stand in for a controller, so you can play without a pad.", &[]),
+        setting("skip_intro", Kind::Bool, "true", "Skip intro",
+            "Goes straight to the menu instead of playing the logos and opening movie.", &[]),
+        setting("audio_mute", Kind::Bool, "false", "Mute audio", "Silences all game sound.", &[]),
+        advanced("hid_sdl_directinput", Kind::Bool, "false", "Legacy DirectInput pads",
+            "Only needed for controllers older than XInput. Leave it off: enabling it adds a \
+             polling delay that shows up as input lag.", &[]),
     ]
 }
+
 pub fn all() -> Vec<Setting> { [display(), graphics(), input()].concat() }
+
+/// A one-click graphics profile. Only the graphics group is touched, so a
+/// player's display and input choices survive switching between them.
+pub struct Preset {
+    pub name: &'static str,
+    pub help: &'static str,
+    pub values: &'static [(&'static str, &'static str)],
+}
+
+/// Ordered cheapest first. "3x plus CAS" is the practical ceiling on this
+/// engine - 4x stutters - so Quality stops there rather than at 8x.
+pub fn presets() -> &'static [Preset] {
+    &[
+        Preset {
+            name: "Performance",
+            help: "Native resolution, cheapest anti-aliasing. For laptops and older GPUs.",
+            values: &[
+                ("resolution_scale", "1"), ("draw_resolution_scale_x", "1"), ("draw_resolution_scale_y", "1"),
+                ("native_2x_msaa", "false"), ("swap_post_effect", "fxaa"),
+                ("anisotropic_override", "2"), ("present_effect", "cas"),
+                ("scaled_point_filter_linear", "true"),
+            ],
+        },
+        Preset {
+            name: "Balanced",
+            help: "Twice the internal resolution with hardware anti-aliasing. A good default.",
+            values: &[
+                ("resolution_scale", "2"), ("draw_resolution_scale_x", "1"), ("draw_resolution_scale_y", "1"),
+                ("native_2x_msaa", "true"), ("swap_post_effect", "none"),
+                ("anisotropic_override", "3"), ("present_effect", "cas"),
+                ("scaled_point_filter_linear", "true"),
+            ],
+        },
+        Preset {
+            name: "Quality",
+            help: "Three times the internal resolution, the practical ceiling before the \
+                   frame rate suffers. Wants a desktop GPU.",
+            values: &[
+                ("resolution_scale", "3"), ("draw_resolution_scale_x", "1"), ("draw_resolution_scale_y", "1"),
+                ("native_2x_msaa", "true"), ("swap_post_effect", "fxaa"),
+                ("anisotropic_override", "5"), ("present_effect", "cas"),
+                ("scaled_point_filter_linear", "true"),
+            ],
+        },
+    ]
+}
+
+/// Which preset the current graphics settings correspond to, or `None` for
+/// "Custom". Derived rather than stored, so hand-editing launcher.json or
+/// changing one dropdown lands on Custom without anything to keep in sync.
+pub fn active_preset(cfg: &Config) -> Option<&'static str> {
+    presets()
+        .iter()
+        .find(|p| {
+            p.values.iter().all(|(k, v)| {
+                cfg.game.get(*k).map(String::as_str)
+                    == Some(*v)
+            })
+        })
+        .map(|p| p.name)
+}
+
+pub fn apply_preset(cfg: &mut Config, name: &str) {
+    if let Some(p) = presets().iter().find(|p| p.name == name) {
+        for (k, v) in p.values {
+            cfg.game.insert(k.to_string(), v.to_string());
+        }
+    }
+}
+
+/// The aspect ratio of a display, formatted the way the cvar wants it.
+pub fn aspect_for(width: f32, height: f32) -> Option<String> {
+    (width > 0.0 && height > 0.0).then(|| format!("{:.6}", width / height))
+}
 
 pub fn to_toml(s: &Setting, value: &str) -> String {
     match s.kind { Kind::Str => format!("\"{}\"", value), Kind::Double => format!("{:.6}", value.parse::<f64>().unwrap_or(0.0)), _ => value.to_string() }
@@ -56,16 +215,6 @@ pub fn save_cfg(app_dir: &Path, c: &Config) {
     let _ = std::fs::write(app_dir.join("launcher.json"), serde_json::to_string_pretty(c).unwrap_or_default());
 }
 
-pub fn toml_read(path: &Path) -> BTreeMap<String, String> {
-    let mut m = BTreeMap::new();
-    if !path.exists() { return m; }
-    for line in std::fs::read_to_string(path).unwrap_or_default().lines() {
-        let t = line.trim();
-        if t.starts_with('#') { continue; }
-        if let Some(eq) = t.find('=') { m.insert(t[..eq].trim().to_string(), t[eq+1..].trim().trim_matches('"').to_string()); }
-    }
-    m
-}
 pub fn toml_merge(existing: &str, managed: &BTreeMap<String, String>) -> String {
     let mut pending = managed.clone();
     let mut out = String::new();
@@ -151,6 +300,59 @@ fullscreen = false
         assert!(out.contains("#fullscreen = false"), "{out}");
         assert!(out.contains("
 fullscreen = true"), "{out}");
+    }
+
+    #[test]
+    fn factory_defaults_match_a_preset() {
+        // Otherwise a fresh install opens on "Custom", which reads like the
+        // player already changed something.
+        let mut cfg = Config::default();
+        for s in all() { cfg.game.insert(s.key.to_string(), s.default.to_string()); }
+        assert_eq!(active_preset(&cfg), Some("Balanced"));
+    }
+
+    #[test]
+    fn presets_round_trip_and_fall_back_to_custom() {
+        let mut cfg = Config::default();
+        for s in all() { cfg.game.insert(s.key.to_string(), s.default.to_string()); }
+
+        for p in presets() {
+            apply_preset(&mut cfg, p.name);
+            assert_eq!(active_preset(&cfg), Some(p.name), "{} should report itself", p.name);
+        }
+
+        // Changing any single graphics value must drop to Custom.
+        apply_preset(&mut cfg, "Balanced");
+        cfg.game.insert("anisotropic_override".into(), "0".into());
+        assert_eq!(active_preset(&cfg), None);
+
+        // Display and input choices are not part of a preset, so they must not
+        // affect which preset is reported.
+        apply_preset(&mut cfg, "Quality");
+        cfg.game.insert("fullscreen".into(), "false".into());
+        cfg.game.insert("skip_intro".into(), "false".into());
+        assert_eq!(active_preset(&cfg), Some("Quality"));
+    }
+
+    #[test]
+    fn preset_keys_all_exist_as_settings() {
+        let keys: Vec<&str> = all().iter().map(|s| s.key).collect();
+        for p in presets() {
+            for (k, v) in p.values {
+                assert!(keys.contains(k), "preset {} sets unknown key {k}", p.name);
+                let s = all().into_iter().find(|s| s.key == *k).unwrap();
+                if !s.choices.is_empty() {
+                    assert!(s.choices.iter().any(|(val, _)| val == v),
+                        "preset {} sets {k}={v}, not one of its choices", p.name);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn aspect_for_a_3440x1440_display() {
+        assert_eq!(aspect_for(3440.0, 1440.0).as_deref(), Some("2.388889"));
+        assert_eq!(aspect_for(0.0, 1080.0), None);
     }
 
     #[test]

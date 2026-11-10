@@ -14,7 +14,7 @@ path = "src/bin/DOA4Launcher_tui.rs"
 [dependencies]
 eframe = "0.31"
 egui = "0.31"
-ratatui = "0.29"
-crossterm = "0.28"
+# Native file pickers for the ISO / exe / game-data paths.
+rfd = "0.15"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

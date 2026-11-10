@@ -10,7 +10,7 @@
 #   cargo build --release --manifest-path rust\compiler\Cargo.toml
 #   cargo build --release --manifest-path rust\launcher\Cargo.toml
 #   cmake -S thirdparty\rexglue-sdk -B out\sdk ... && cmake --build out\sdk
-# then:  tools\package_quiver.ps1 -SdkBin out\sdk\sdk-bin
+# then:  tools\package_release.ps1 -SdkBin out\sdk\sdk-bin
 param(
     # Where rexgluerd.exe and the runtime DLLs were built. Defaults to this
     # repo's own lean build; point it elsewhere to reuse another build tree.

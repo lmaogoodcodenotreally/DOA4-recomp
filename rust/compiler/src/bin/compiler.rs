@@ -116,7 +116,16 @@ impl eframe::App for App {
             ui.group(|ui| {
                 ui.label(egui::RichText::new("2. Your ISO").strong());
                 ui.horizontal(|ui| {
-                    ui.add(egui::TextEdit::singleline(&mut self.iso).desired_width(460.0).hint_text("drag the .iso here, or paste its path"));
+                    ui.add(egui::TextEdit::singleline(&mut self.iso).desired_width(380.0)
+                        .hint_text("drag the .iso here, or paste its path"));
+                    if ui.button("Browse...").clicked() {
+                        if let Some(p) = rfd::FileDialog::new()
+                            .add_filter("Xbox 360 disc image", &["iso", "xiso", "xex"])
+                            .pick_file()
+                        {
+                            self.iso = p.display().to_string();
+                        }
+                    }
                 });
                 if dc::already_extracted(&self.dir) {
                     ui.label("game\\ is already extracted here - the ISO step will be skipped.");

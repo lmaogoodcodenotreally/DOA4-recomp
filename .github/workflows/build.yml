@@ -56,7 +56,7 @@ jobs:
 
       - name: Package the release zip
         shell: pwsh
-        run: ./tools/package_quiver.ps1 -SdkBin out/sdk/sdk-bin
+        run: ./tools/package_release.ps1 -SdkBin out/sdk/sdk-bin
 
       - uses: actions/upload-artifact@v4
         with: { name: DOA4-recomp-win-x64, path: publish/DOA4-recomp-win-x64.zip }
