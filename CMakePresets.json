@@ -120,6 +120,7 @@
                 "REXGLUE_ENABLE_PERF_COUNTERS": "OFF",
                 "REXGLUE_ENABLE_FIDELITYFX": "ON",
                 "REXGLUE_OUTPUT_DIR": "${sourceDir}/out/build/${presetName}/sdk-bin",
+                "REXGLUE_DISABLE_VERSION_RESOURCE": "ON",
                 "CMAKE_C_FLAGS": "-march=x86-64-v3 -DREX_DIAG_DEFAULT=0",
                 "CMAKE_CXX_FLAGS": "-march=x86-64-v3 -DREX_DIAG_DEFAULT=0",
                 "CMAKE_C_FLAGS_RELWITHDEBINFO": "-O3 -DNDEBUG",

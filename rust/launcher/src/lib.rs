@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub struct Setting { pub key: &'static str, pub kind: Kind, pub default: &'static str, pub label: &'static str, pub choices: Vec<(&'static str, &'static str)> }
@@ -14,7 +14,7 @@ pub fn display() -> Vec<Setting> {
         Setting{key:"window_width",kind:Kind::Int,default:"0",label:"Window width",choices:vec![]},
         Setting{key:"window_height",kind:Kind::Int,default:"0",label:"Window height",choices:vec![]},
         Setting{key:"aspect_ratio",kind:Kind::Double,default:"-1",label:"Aspect ratio",choices:vec![("-1","Auto"),("0","16:9"),("1.333333","4:3"),("1.6","16:10"),("2.370370","21:9 2560x1080"),("2.388889","21:9 3440x1440"),("2.4","21:9 3840x1600"),("3.555556","32:9")]},
-        Setting{key:"present_letterbox",kind:Kind::Bool,default:"true",label:"Keep 16:9 (letterbox)",choices:vec![]},
+        Setting{key:"present_letterbox",kind:Kind::Bool,default:"false",label:"Keep 16:9 (letterbox)",choices:vec![]},
         Setting{key:"frame_interp",kind:Kind::Bool,default:"false",label:"Frame interpolation (experimental)",choices:vec![]},
         Setting{key:"d3d12_allow_variable_refresh_rate_and_tearing",kind:Kind::Bool,default:"false",label:"Screen sync",choices:vec![("false","V-Sync"),("true","Off (tearing)")]},
     ]
@@ -96,11 +96,22 @@ pub fn auto_detect(app_dir: &Path) -> (String, String, String) {
     (lean, dev, data)
 }
 
+/// Nothing to launch until compiler.exe has produced the exe and the dump.
+pub fn game_built(cfg: &Config) -> bool {
+    !cfg.lean_exe.is_empty() && Path::new(&cfg.lean_exe).exists()
+        && !cfg.data_root.is_empty() && Path::new(&cfg.data_root).join("default.xex").exists()
+}
+
 pub fn launch(app_dir: &Path, cfg: &Config) -> Result<String, String> {
     save_cfg(app_dir, cfg);
     let exe = if cfg.use_dev { &cfg.dev_exe } else { &cfg.lean_exe };
-    if !Path::new(exe).exists() { return Err(format!("Game exe not found: {}", exe)); }
-    if !Path::new(&cfg.data_root).exists() { return Err(format!("Game data folder not found: {}", cfg.data_root)); }
+    if exe.is_empty() || !Path::new(exe).exists() {
+        return Err(format!("No game executable yet{}. Run compiler.exe first.",
+            if exe.is_empty() { String::new() } else { format!(" at {exe}") }));
+    }
+    if !Path::new(&cfg.data_root).join("default.xex").exists() {
+        return Err(format!("No game data at {}. Run compiler.exe first.", cfg.data_root));
+    }
     let exe_dir = Path::new(exe).parent().ok_or("bad exe path")?;
     let toml = exe_dir.join(format!("{}.toml", Path::new(exe).file_stem().unwrap().to_string_lossy()));
     let managed: BTreeMap<String, String> = all().iter().map(|s| (s.key.to_string(), to_toml(s, cfg.game.get(s.key).unwrap_or(&s.default.to_string())))).collect();
@@ -112,4 +123,39 @@ pub fn launch(app_dir: &Path, cfg: &Config) -> Result<String, String> {
     if !cfg.use_dev { cmd.env("REX_DIAG", "0"); }
     cmd.spawn().map_err(|e| e.to_string())?;
     Ok(format!("Launched {}", if cfg.use_dev { "dev" } else { "play" }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn merge_overwrites_managed_keys_and_keeps_the_rest() {
+        let out = toml_merge(
+            "# header
+log_level = \"debug\"
+fullscreen = false
+",
+            &BTreeMap::from([("fullscreen".into(), "true".into()), ("resolution_scale".into(), "2".into())]),
+        );
+        assert!(out.contains("log_level = \"debug\""), "{out}");
+        assert!(out.contains("fullscreen = true") && !out.contains("fullscreen = false"), "{out}");
+        assert!(out.contains("resolution_scale = 2"), "{out}");
+        assert!(out.starts_with("# header"), "{out}");
+    }
+
+    #[test]
+    fn commented_keys_are_not_treated_as_managed() {
+        let out = toml_merge("#fullscreen = false
+", &BTreeMap::from([("fullscreen".into(), "true".into())]));
+        assert!(out.contains("#fullscreen = false"), "{out}");
+        assert!(out.contains("
+fullscreen = true"), "{out}");
+    }
+
+    #[test]
+    fn doubles_are_written_as_toml_floats() {
+        let s = &display().into_iter().find(|s| s.key == "aspect_ratio").unwrap();
+        assert_eq!(to_toml(s, "-1"), "-1.000000");
+    }
 }

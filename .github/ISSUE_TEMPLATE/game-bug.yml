@@ -1,0 +1,31 @@
+name: Game bug
+description: The game builds and runs, but something is wrong in-game
+labels: [game]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please attach the newest log from the `logs\` folder next to the game exe.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens, and what you expected
+    validations: { required: true }
+  - type: textarea
+    id: where
+    attributes:
+      label: Where it happens
+      description: Which mode, stage, character or menu. Does it reproduce every time?
+    validations: { required: true }
+  - type: textarea
+    id: settings
+    attributes:
+      label: Your launcher settings
+      description: "Paste doa4retail.toml, or run: DOA4Launcher-tui.exe --list"
+    validations: { required: true }
+  - type: textarea
+    id: log
+    attributes:
+      label: Game log and system
+      description: Attach logs\doa4retail_*.log, and say which GPU and Windows version.
+    validations: { required: true }

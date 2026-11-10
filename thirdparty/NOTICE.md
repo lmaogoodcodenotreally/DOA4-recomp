@@ -23,6 +23,20 @@ input/D3D12/movie-skip fixes and frame interpolation (experimental cvar,
 default off). All original license and copyright headers inside the
 submodule are retained unchanged.
 
+It also carries three build fixes needed to configure and compile v0.10.1
+from a clean tree:
+
+- `src/ui/rex_app.cpp` called `BuildLogConfig()` and `ui::Window::Create()`
+  with the pre-v0.10.1 argument lists. It is the only caller of either and is
+  compiled into the consumer's target, so the SDK's own build never caught it.
+- `cmake/rex_version.cmake` lost `rexglue_add_version_resource()` in a merge
+  while its three call sites remained, so configure failed with "Unknown CMake
+  command". Restored from 9dea59f, now also honouring
+  `REXGLUE_DISABLE_VERSION_RESOURCE`.
+- `thirdparty/CMakeLists.txt` tested for `<submodule>/.git` to decide whether
+  dependencies were present, which is false inside a source archive. It now
+  tests for content.
+
 To build from a fresh clone:
 
 ```bat

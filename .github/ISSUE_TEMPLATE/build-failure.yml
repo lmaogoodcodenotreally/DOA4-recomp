@@ -1,0 +1,36 @@
+name: Build failure
+description: compiler.exe could not produce a playable build
+labels: [build]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please attach **compiler.log** (next to compiler.exe). It holds the real
+        compiler error; the message in the window is only an excerpt.
+
+        Two known non-bugs: a `^` anywhere in the install path, and any region
+        or revision other than USA/Europe Rev 1.
+  - type: textarea
+    id: log
+    attributes:
+      label: compiler.log
+      description: Attach the file, or paste the last ~50 lines.
+    validations: { required: true }
+  - type: input
+    id: path
+    attributes:
+      label: Folder you unzipped into
+      placeholder: D:\Games\DOA4-recomp
+    validations: { required: true }
+  - type: input
+    id: xex
+    attributes:
+      label: Size of game\default.xex in bytes
+      description: "Must be 16465920. Right-click the file, Properties."
+    validations: { required: true }
+  - type: textarea
+    id: tools
+    attributes:
+      label: Tool versions
+      description: "Output of: cmake --version & ninja --version & clang++ --version"
+    validations: { required: false }
