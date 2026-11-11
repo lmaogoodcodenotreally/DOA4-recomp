@@ -2,7 +2,7 @@
   DOA4-recomp
 </h1>
 <p align="center">
-  <a href="[https://github.com/Kikubay/AnimeLens](https://github.com/user-attachments/assets/26bac3bb-3218-4881-bd9e-14dccea18824)">
+  <a href="[https://github.com/user-attachments/assets/26bac3bb-3218-4881-bd9e-14dccea18824](https://github.com/user-attachments/assets/26bac3bb-3218-4881-bd9e-14dccea18824)">
     <img width="3440" height="1440" alt="image" src="https://github.com/user-attachments/assets/26bac3bb-3218-4881-bd9e-14dccea18824" />
 
   </a>
