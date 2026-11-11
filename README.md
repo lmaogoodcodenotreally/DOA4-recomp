@@ -22,7 +22,7 @@ Work in progress, and heavily AI-assisted.
 - **Dead or Alive 4 (USA, Europe) — Revision 1**, dumped from your own disc as
   an `.iso`. Inside it, `default.xex` must be exactly **16,465,920 bytes**.
   Other regions and revisions do **not** work: the function addresses in
-  `doa4retail_manifest.toml` only match this one build.
+  `doa4retail_manifest.toml` only match this one build. (If you want play the original build and not rev 0 go see [doa4-recomp-suite](https://github.com/redC0rvus/doa4-recomp-suite) by [redC0rvus](https://github.com/redC0rvus/) 
 - **64-bit Windows 10 or 11** and a GPU that supports Direct3D 12.
 - A CPU with **AVX2** — any Intel from 2013 (Haswell) or AMD from 2015 onward.
 - About **15 GB** of free space for the dump, the generated code and the build.
