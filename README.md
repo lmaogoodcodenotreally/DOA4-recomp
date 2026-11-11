@@ -7,7 +7,7 @@ monitor's resolution and refresh rate, in proper widescreen, with modern
 controllers.
 
 Work in progress, and heavily AI-assisted.
-
+<img width="3440" height="1440" alt="image" src="https://github.com/user-attachments/assets/26bac3bb-3218-4881-bd9e-14dccea18824" />
 > **You need your own copy of the game.** No game code or data is in this
 > repository and none is downloaded. You supply a dump of your own disc and the
 > included compiler turns it into a playable build on your machine. Your dump
