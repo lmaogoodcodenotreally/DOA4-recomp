@@ -44,6 +44,19 @@ Toggled with F5; F6 marks a felt hitch in the log. Content:
   (the game's own resolver → applier interaction path); the cfg dump is
   read-only. Writing the stage-ID global directly would NOT load anything
   (the applier does the work).
+- **Guest memory:** stands in for E3's P1 R3 memory statistics
+  (`dbg_mem_stats_on_P1_R3` 0x823BF208 → `MmQueryStatistics`; retail has
+  neither). Shows free/total physical and virtual memory computed the same way
+  as the runtime's `MmQueryStatistics` (physical heaps 4K/64K/16M page
+  counts, 512 MB physical, `0x2FFE0000` virtual); "Log memory stats" writes
+  one `DOA4 memory:` line. No pad combo: P1 R3 is taken by the KYN/KYO/TCR
+  stage toggles.
+- **Stage info (launcher Debug tab, `doa4_stage_info`):** the stage overlay
+  names the running stage on every stage (code, slot, file ids, object) and
+  the log gets one `DOA4 stage info:` line per stage change. Design:
+  `hooks.md`, "Stage info on every stage".
+- **Glow tuner:** colour pickers and sliders for the shared glow post-process
+  on any stage that uses it (TCR's P1 R3 tuner values). Design: `hooks.md`, "Glow tuner".
 - **Chain-churn instrument:** the applier both applies AND clears the chain
   (`arg0 == 0x7FFFFFFF` → invalidate path), so any caller re-running it per
   frame shows up as value churn — on screen as the stage obj flickering, in

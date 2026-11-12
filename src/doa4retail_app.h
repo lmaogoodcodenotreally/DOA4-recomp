@@ -17,6 +17,8 @@
 #include <rex/logging/macros.h>
 #include <rex/perf/counter.h>
 #include <rex/rex_app.h>
+#include <rex/system/kernel_state.h>
+#include <rex/system/xmemory.h>
 #include <rex/ui/imgui_drawer.h>
 #include <rex/ui/keybinds.h>
 
@@ -30,6 +32,18 @@
 REXCVAR_DECLARE(uint32_t, perf_state_addr);
 
 #if !DOA4_LEAN
+// Debug free camera toggle (src/doa4_freecam.cpp). Design: docs/hooks.md.
+void Doa4ToggleFreecam();
+// Stage debug hotkeys (src/doa4_stage_debug.cpp). Design: docs/hooks.md.
+void Doa4ReplayDsEvent();
+void Doa4CycleStTuner();
+void Doa4ToggleStageOverlay();
+void Doa4ToggleProBeams();
+// Glow tuner section of the F5 tab (src/doa4_glow_tuner.cpp).
+void Doa4DrawGlowTuner(uint8_t* base);
+void Doa4InitStageOverlay(rex::ui::ImGuiDrawer* drawer, rex::ui::WindowedAppContext* ui);
+void Doa4ShutdownStageOverlay();
+
 // DOA4 debug tab (F5 toggle, F6 mark). Design: docs/debug.md.
 class Doa4DebugDialog : public rex::ui::ImGuiDialog {
  public:
@@ -51,6 +65,9 @@ class Doa4DebugDialog : public rex::ui::ImGuiDialog {
       : ImGuiDialog(drawer),
         guest_base_(std::move(guest_base)),
         mark_fn_(mark_fn) {}
+
+  // Redrawn with each game frame; display-rate repaints cost frame time.
+  bool WantsContinuousRepaint() const override { return false; }
 
  protected:
   void OnDraw(ImGuiIO& io) override {
@@ -195,10 +212,41 @@ class Doa4DebugDialog : public rex::ui::ImGuiDialog {
       }
     }
 
+    DrawGuestMemory();
+    Doa4DrawGlowTuner(base);
+
     ImGui::End();
   }
 
  private:
+  // Stands in for E3's P1 R3 memory statistics (dbg_mem_stats_on_P1_R3
+  // 0x823BF208, MmQueryStatistics; both gone from retail). Same numbers the
+  // runtime's MmQueryStatistics would hand the guest. Design: docs/debug.md.
+  static void DrawGuestMemory() {
+    auto* mem = rex::system::kernel_memory();
+    if (!mem) return;
+    const rex::memory::BaseHeap* heaps[3] = {mem->LookupHeapByType(true, 0x1000),
+                                             mem->LookupHeapByType(true, 0x10000),
+                                             mem->LookupHeapByType(true, 0x1000000)};
+    if (!heaps[0] || !heaps[1] || !heaps[2]) return;
+    uint32_t unreserved = 0, reserved = 0, used = 0, reserved_bytes = 0;
+    mem->GetHeapsPageStatsSummary(heaps, 3, unreserved, reserved, used, reserved_bytes);
+    constexpr uint32_t kTotalPages = 0x20000, kKernelPages = 0x100;  // as MmQueryStatistics
+    constexpr uint32_t kTotalV = 0x2FFE0000;
+    const double mb = 1.0 / (1024 * 1024);
+    const double total_p = kTotalPages * 4096.0 * mb;
+    const double avail_p = (kTotalPages - kKernelPages - used) * 4096.0 * mb;
+    const double avail_v = (kTotalV - reserved_bytes) * mb;
+    ImGui::Separator();
+    ImGui::TextUnformatted("Guest memory");
+    ImGui::Text("physical: %.1f MB free of %.1f MB", avail_p, total_p);
+    ImGui::Text("virtual:  %.1f MB free of %.1f MB", avail_v, kTotalV * mb);
+    if (ImGui::SmallButton("Log memory stats")) {
+      REXLOG_INFO("DOA4 memory: physical {:.1f}/{:.1f} MB free, virtual {:.1f}/{:.1f} MB free",
+                  avail_p, total_p, avail_v, kTotalV * mb);
+    }
+  }
+
   static uint16_t ReadBE16(const uint8_t* base, uint32_t addr) {
     return static_cast<uint16_t>((static_cast<uint16_t>(base[addr]) << 8) |
                                  base[addr + 1]);
@@ -337,7 +385,7 @@ class Doa4retailApp : public rex::ReXApp {
     REXCVAR_SET(perf_state_addr, 0x82C31C24u);  // v1 fallback (see above)
   }
 
-  // F5/F6 binds (see docs/architecture.md, docs/debug.md).
+  // F5/F6/F8/F9/F11/Home binds (see docs/architecture.md, docs/debug.md).
   void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {
     rex::ui::RegisterBind("bind_doa4_debug", "F5", "Toggle DOA4 debug tab",
                           [this, drawer] {
@@ -356,12 +404,29 @@ class Doa4retailApp : public rex::ReXApp {
     rex::ui::RegisterBind("bind_doa4_mark", "F6",
                           "Mark felt hitch in DOA4 log (state snapshot)",
                           [this] { MarkState("F6MARK"); });
+    rex::ui::RegisterBind("bind_doa4_freecam", "F8", "Toggle debug free camera",
+                          [] { Doa4ToggleFreecam(); });
+    rex::ui::RegisterBind("bind_doa4_ds_event", "F9", "Replay stage DS event animation",
+                          [] { Doa4ReplayDsEvent(); });
+    rex::ui::RegisterBind("bind_doa4_st_tuner", "F11", "Cycle stage ST flipbook tuner",
+                          [] { Doa4CycleStTuner(); });
+    rex::ui::RegisterBind("bind_doa4_overlay", "Home", "Show/hide DOA4 stage debug overlay",
+                          [] { Doa4ToggleStageOverlay(); });
+    rex::ui::RegisterBind("bind_doa4_pro_beams", "End", "Toggle stage PRO light beams",
+                          [] { Doa4ToggleProBeams(); });
+    Doa4InitStageOverlay(drawer, &app_context());
   }
 
   void OnShutdown() override {
     rex::ui::UnregisterBind("bind_doa4_debug");
     rex::ui::UnregisterBind("bind_doa4_mark");
+    rex::ui::UnregisterBind("bind_doa4_freecam");
+    rex::ui::UnregisterBind("bind_doa4_ds_event");
+    rex::ui::UnregisterBind("bind_doa4_st_tuner");
+    rex::ui::UnregisterBind("bind_doa4_overlay");
+    rex::ui::UnregisterBind("bind_doa4_pro_beams");
     debug_tab_.reset();
+    Doa4ShutdownStageOverlay();
   }
 
   // Felt-hitch breadcrumb (see docs/debug.md).

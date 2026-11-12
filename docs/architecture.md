@@ -60,12 +60,27 @@ for the current state id, installable game-agnostically from the app.
 - `DOA4Launcher.exe`: writes `doa4retail.toml` (preserving foreign keys via
   TOML merge) and launches the game with
   `--game_data_root game --gpu_plugin xenos`; the play build also sets
-  `REX_DIAG=0`. On first run it auto-detects `doa4retail.exe` and `game\`
-  beside the launcher, or the repo `out/build/<preset>/` layout.
+  `REX_DIAG=0`. On first run it auto-detects `doa4retail.exe`,
+  `dev\doa4retail.exe` (developer build) and `game\` beside the launcher, or
+  the repo `out/build/<preset>/` layout. The Paths tab's Re-detect only fills
+  paths that are empty or missing on disk, never a working one.
 
-## F5/F6 keybinds
+## F5/F6/F8/F9/F11/Home/End keybinds
 
-F5 (debug tab) and F6 (mark hitch) are free of SDK binds (F3 debug, F4
-settings, F7 achievements, Backtick console) and show up rebindable in the
-settings overlay. Kept app-side so the SDK stays game-agnostic. Details in
+F5 (debug tab, `bind_doa4_debug`), F6 (mark hitch, `bind_doa4_mark`), F8 (free camera, `bind_doa4_freecam`), F9
+(DS event replay, `bind_doa4_ds_event`), F11 (ST flipbook tuner,
+`bind_doa4_st_tuner`), Home (stage overlay, `bind_doa4_overlay`) and End (PRO
+light beams, `bind_doa4_pro_beams`) are free
+of SDK binds (F3 debug, F4 settings, F7 achievements, Backtick console)
+and of the keyboard-as-controller defaults, and show up rebindable in the
+settings overlay. The launcher's Debug tab writes these `bind_doa4_*` keys
+(and the `doa4_all_vs_stages` and `doa4_stage_info` switches), and only when the developer build is selected: the play build never registers
+them and would log "unknown cvar". Kept app-side so the SDK stays game-agnostic. Details in
 `debug.md`.
+
+In the launcher every bind is a button: click it, press the new key (Escape
+cancels), and the arrow next to it resets that one bind. Only keys the game's
+bind parser knows are accepted (`KEY_NAMES` in `rust/launcher/src/lib.rs`,
+mirroring `keybinds.cpp`; egui cannot tell numpad keys apart, so those are
+only reachable through the console launcher). A bind that clashes with
+another bind or a runtime default (F3, F4, F7, Backtick) is flagged.

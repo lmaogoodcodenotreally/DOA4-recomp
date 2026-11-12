@@ -17,7 +17,7 @@ pub struct Setting {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Kind { Bool, Int, Double, Str }
+pub enum Kind { Bool, Int, Double, Str, Key }
 
 fn setting(
     key: &'static str, kind: Kind, default: &'static str, label: &'static str,
@@ -123,7 +123,89 @@ pub fn input() -> Vec<Setting> {
     ]
 }
 
-pub fn all() -> Vec<Setting> { [display(), graphics(), input()].concat() }
+/// Key names the game's bind parser accepts (thirdparty/rexglue-sdk/src/ui/keybinds.cpp),
+/// minus the modifiers and mouse buttons, which make poor single-key binds.
+pub const KEY_NAMES: &[&str] = &[
+    "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+    "F13", "F14", "F15", "F16", "F17", "F18", "F19", "F20", "F21", "F22", "F23", "F24",
+    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R",
+    "S", "T", "U", "V", "W", "X", "Y", "Z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+    "Backtick", "Minus", "Plus", "Comma", "Period", "Semicolon", "Slash", "Backslash",
+    "LBracket", "RBracket", "Quote", "Escape", "Return", "Space", "Tab", "Backspace", "Delete",
+    "Insert", "Home", "End", "PageUp", "PageDown", "Left", "Right", "Up", "Down",
+    "Numpad0", "Numpad1", "Numpad2", "Numpad3", "Numpad4", "Numpad5", "Numpad6", "Numpad7",
+    "Numpad8", "Numpad9", "NumpadPlus", "NumpadMinus", "NumpadStar", "NumpadSlash",
+    "PrintScreen", "Pause", "CapsLock", "NumLock", "ScrollLock",
+];
+
+/// Binds the runtime itself registers (thirdparty/rexglue-sdk/src/ui/rex_app.cpp, defaults).
+pub const RUNTIME_BINDS: &[(&str, &str)] = &[
+    ("F3", "the runtime's debug overlay"), ("F4", "the runtime's settings overlay"),
+    ("F7", "the runtime's achievements overlay"), ("Backtick", "the runtime's console"),
+];
+
+/// What else already uses `key`, if anything: another of our binds or a runtime one.
+pub fn bind_conflict(cfg: &Config, own: &str, key: &str) -> Option<String> {
+    if let Some((_, what)) = RUNTIME_BINDS.iter().find(|(k, _)| *k == key) {
+        return Some(what.to_string());
+    }
+    all().into_iter()
+        .filter(|s| s.kind == Kind::Key && s.key != own)
+        .find(|s| cfg.game.get(s.key).map(String::as_str).unwrap_or(s.default) == key)
+        .map(|s| s.label.to_string())
+}
+
+/// Developer-build switches. The play build compiles their hooks out, so
+/// `managed` only writes them when the developer build is selected.
+pub fn debug() -> Vec<Setting> {
+    vec![
+        setting("doa4_all_vs_stages", Kind::Bool, "false", "All stages in Versus",
+            "Makes every stage on the Versus stage-select screen selectable, including the ones \
+             your save has not unlocked yet (RN, AQU, BO) and those a Versus sub-mode normally \
+             hides. It also adds the 8 stages that never had a Versus entry but are on the \
+             disc (MK2, POL, NY2, TS2, DAN, BAB, TCR, KYR) at the end of the list, with the \
+             Random picture as a placeholder and the real stage name shown on screen. Nothing is \
+             written to your save. Offline only.", &[]),
+        setting("doa4_stage_info", Kind::Bool, "false", "Stage info on every stage",
+            "Adds the running stage's internal identifiers to the stage overlay on every stage, not \
+             only the ones with developer controls: its code name (e.g. TCR), slot number, file ids \
+             and stage object. Hidden with the stage overlay key like the rest of the panel.", &[]),
+        setting("bind_doa4_debug", Kind::Key, "F5", "Debug tab key",
+            "Shows or hides the developer debug window: live game state, the stage chain, guest \
+             memory and the glow tuner (colour pickers and sliders for the stage glow).", &[]),
+        setting("bind_doa4_mark", Kind::Key, "F6", "Log mark key",
+            "Writes a marker line with the current game state into the log, to point at the moment \
+             something looked or felt wrong.", &[]),
+        setting("bind_doa4_freecam", Kind::Key, "F8", "Free camera key",
+            "Turns the debug free camera on and off. While it is on, the first controller moves the \
+             camera instead of your fighter: the D-pad orbits, Y/A zoom, LB or X/B with the D-pad \
+             moves the point it looks at, RB with the D-pad changes the field of view, and holding RT \
+             goes faster. Start still pauses.",
+            &[]),
+        setting("bind_doa4_ds_event", Kind::Key, "F9", "DS event replay key",
+            "On the DS stage, replays the stage's event animation - the manual trigger the E3 demo \
+             had on LB.",
+            &[]),
+        setting("bind_doa4_st_tuner", Kind::Key, "F11", "ST flipbook tuner key",
+            "On the ST stage, turns on the developers' unused tuner for the animated flipbook \
+             effects and steps through them one press at a time (off, 1, 2, ... 6, off). The first \
+             controller's D-pad up/down picks scale X, Y, Z or speed, left/right changes it, and LB/RB \
+             make each step bigger. The flipbooks only appear in some ST scenes.",
+            &[]),
+        setting("bind_doa4_overlay", Kind::Key, "Home", "Stage overlay key",
+            "Shows or hides the corner panel that appears on stages with developer controls (DS, \
+             ST, KYN, KYO, NY2, TCR, PRO), while the free camera is on, and on every stage when \
+             \"Stage info on every stage\" is on. It lists each stage's keys and combos with their \
+             current state; every toggle is also written to the log.",
+            &[]),
+        setting("bind_doa4_pro_beams", Kind::Key, "End", "PRO light beams key",
+            "On the PRO stage, turns the stage's light beams off and on - the switch the E3 demo had \
+             on the second controller (RT + R3). They start on.",
+            &[]),
+    ]
+}
+
+pub fn all() -> Vec<Setting> { [display(), graphics(), input(), debug()].concat() }
 
 /// A one-click graphics profile. Only the graphics group is touched, so a
 /// player's display and input choices survive switching between them.
@@ -200,7 +282,7 @@ pub fn aspect_for(width: f32, height: f32) -> Option<String> {
 }
 
 pub fn to_toml(s: &Setting, value: &str) -> String {
-    match s.kind { Kind::Str => format!("\"{}\"", value), Kind::Double => format!("{:.6}", value.parse::<f64>().unwrap_or(0.0)), _ => value.to_string() }
+    match s.kind { Kind::Str | Kind::Key => format!("\"{}\"", value), Kind::Double => format!("{:.6}", value.parse::<f64>().unwrap_or(0.0)), _ => value.to_string() }
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -233,6 +315,7 @@ pub fn toml_merge(existing: &str, managed: &BTreeMap<String, String>) -> String 
 pub fn auto_detect(app_dir: &Path) -> (String, String, String) {
     let mut lean = String::new(); let mut dev = String::new(); let mut data = String::new();
     if app_dir.join("doa4retail.exe").exists() { lean = app_dir.join("doa4retail.exe").display().to_string(); }
+    if app_dir.join("dev/doa4retail.exe").exists() { dev = app_dir.join("dev/doa4retail.exe").display().to_string(); }
     if app_dir.join("game").is_dir() { data = app_dir.join("game").display().to_string(); }
     let mut d = app_dir;
     loop {
@@ -245,10 +328,31 @@ pub fn auto_detect(app_dir: &Path) -> (String, String, String) {
     (lean, dev, data)
 }
 
+/// The Paths tab's Re-detect: only repairs paths that are empty or gone from
+/// disk, so a working hand-picked path is never replaced or blanked.
+pub fn redetect(cfg: &mut Config, (lean, dev, data): (String, String, String)) -> bool {
+    let mut changed = false;
+    for (cur, found) in [(&mut cfg.lean_exe, lean), (&mut cfg.dev_exe, dev), (&mut cfg.data_root, data)] {
+        if (cur.is_empty() || !Path::new(cur.as_str()).exists()) && *cur != found { *cur = found; changed = true; }
+    }
+    if cfg.dev_exe.is_empty() { cfg.use_dev = false; }
+    changed
+}
+
 /// Nothing to launch until compiler.exe has produced the exe and the dump.
 pub fn game_built(cfg: &Config) -> bool {
     !cfg.lean_exe.is_empty() && Path::new(&cfg.lean_exe).exists()
         && !cfg.data_root.is_empty() && Path::new(&cfg.data_root).join("default.xex").exists()
+}
+
+/// The cvars written to the game's TOML. Debug keys only go to the developer
+/// build: the play build never registers them and would warn "unknown cvar".
+pub fn managed(cfg: &Config) -> BTreeMap<String, String> {
+    let dev_only: Vec<&str> = debug().iter().map(|s| s.key).collect();
+    all().iter()
+        .filter(|s| cfg.use_dev || !dev_only.contains(&s.key))
+        .map(|s| (s.key.to_string(), to_toml(s, cfg.game.get(s.key).unwrap_or(&s.default.to_string()))))
+        .collect()
 }
 
 pub fn launch(app_dir: &Path, cfg: &Config) -> Result<String, String> {
@@ -263,7 +367,7 @@ pub fn launch(app_dir: &Path, cfg: &Config) -> Result<String, String> {
     }
     let exe_dir = Path::new(exe).parent().ok_or("bad exe path")?;
     let toml = exe_dir.join(format!("{}.toml", Path::new(exe).file_stem().unwrap().to_string_lossy()));
-    let managed: BTreeMap<String, String> = all().iter().map(|s| (s.key.to_string(), to_toml(s, cfg.game.get(s.key).unwrap_or(&s.default.to_string())))).collect();
+    let managed = managed(cfg);
     let existing = if toml.exists() { std::fs::read_to_string(&toml).unwrap_or_default() } else { "# Auto-generated cvar configuration\n".to_string() };
     std::fs::write(&toml, toml_merge(&existing, &managed)).map_err(|e| e.to_string())?;
     let log = std::env::temp_dir().join("DOA4Launcher/doa4.log");
@@ -353,6 +457,42 @@ fullscreen = true"), "{out}");
     fn aspect_for_a_3440x1440_display() {
         assert_eq!(aspect_for(3440.0, 1440.0).as_deref(), Some("2.388889"));
         assert_eq!(aspect_for(0.0, 1080.0), None);
+    }
+
+    #[test]
+    fn debug_keys_only_reach_the_developer_build() {
+        let mut cfg = Config::default();
+        assert!(!managed(&cfg).contains_key("bind_doa4_freecam"));
+        assert!(managed(&cfg).contains_key("fullscreen"));
+        cfg.use_dev = true;
+        assert_eq!(managed(&cfg).get("bind_doa4_freecam").map(String::as_str), Some("\"F8\""));
+    }
+
+    #[test]
+    fn redetect_keeps_working_paths_and_fills_missing_ones() {
+        let here = std::env::current_exe().unwrap().display().to_string();
+        let mut cfg = Config { lean_exe: here.clone(), dev_exe: here.clone(), data_root: "Z:/gone".into(), use_dev: true, ..Default::default() };
+        assert!(redetect(&mut cfg, (String::new(), String::new(), "found".into())));
+        assert_eq!((cfg.lean_exe.as_str(), cfg.dev_exe.as_str(), cfg.data_root.as_str()), (here.as_str(), here.as_str(), "found"));
+        assert!(cfg.use_dev);
+        cfg.dev_exe = "Z:/gone.exe".into();
+        redetect(&mut cfg, (String::new(), String::new(), String::new()));
+        assert!(cfg.dev_exe.is_empty() && !cfg.use_dev);
+    }
+
+    #[test]
+    fn bind_defaults_are_valid_and_free() {
+        let mut cfg = Config::default();
+        for s in all() { cfg.game.insert(s.key.to_string(), s.default.to_string()); }
+        for s in all().into_iter().filter(|s| s.kind == Kind::Key) {
+            assert!(KEY_NAMES.contains(&s.default), "{} default {} is not a key name", s.key, s.default);
+            assert_eq!(bind_conflict(&cfg, s.key, s.default), None, "{} default clashes", s.key);
+        }
+        cfg.game.insert("bind_doa4_mark".into(), "F8".into());
+        assert_eq!(bind_conflict(&cfg, "bind_doa4_mark", "F8").as_deref(), Some("Free camera key"));
+        assert!(bind_conflict(&cfg, "bind_doa4_mark", "F3").is_some());
+        let debug_key = debug().into_iter().find(|s| s.key == "bind_doa4_debug").unwrap();
+        assert_eq!(to_toml(&debug_key, "F5"), "\"F5\"");
     }
 
     #[test]

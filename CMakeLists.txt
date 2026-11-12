@@ -55,10 +55,15 @@ include("${CMAKE_BINARY_DIR}/rexglue.local.cmake")
 set(DOA4RETAIL_SOURCES
     src/main.cpp
     src/doa4_preview_cut.cpp
+    src/doa4_preview_wind.cpp
     src/doa4_widescreen.cpp
     src/doa4_skip_intro.cpp
     src/doa4_attract_fade.cpp
     src/doa4_frame_probe.cpp
+    src/doa4_freecam.cpp
+    src/doa4_stage_debug.cpp
+    src/doa4_all_stages.cpp
+    src/doa4_glow_tuner.cpp
 )
 
 if(WIN32)

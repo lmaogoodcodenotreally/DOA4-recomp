@@ -96,6 +96,7 @@ GPU. Change any individual setting and the preset switches itself to *Custom*.
 | **Display** | Fullscreen, monitor, aspect ratio, letterboxing, frame interpolation, V-Sync. **Match my display** sets the aspect ratio to your monitor's exact shape for true widescreen. |
 | **Graphics** | Presets, internal resolution (1x–8x), output scaling (CAS / FSR), MSAA, post anti-aliasing, texture filtering. Per-axis render scales live under *Advanced*. |
 | **Input** | Controller backend, keyboard-as-controller, skip intro, mute. Legacy DirectInput pads are under *Advanced* — leave that off unless you need it, as it adds input lag. |
+| **Debug** | Only shown when a developer build is found. The *All stages in Versus* switch (unlocks every Versus stage without touching your save and adds the 8 on-disc stages that never had a Versus entry, with placeholder art) and keys for the developer tools: debug window (F5, includes a glow tuner with colour pickers for every stage that has glow), log mark (F6), free camera (F8), DS stage event replay (F9), ST flipbook tuner (F11), PRO light beams (End) and the stage overlay (Home), a corner panel listing each stage's debug controls. Click a key to rebind it (press the new key, Escape cancels); the arrow beside it resets it. They only work with the developer build selected under *Paths*. |
 | **Paths** | The game exe and data folder, both detected automatically, with **Browse** if you have moved them. |
 
 Internal resolution and the per-axis render scales only take effect after the
@@ -169,7 +170,7 @@ Presets:
 - `win-amd64-relwithdebinfo-lean` — the **play** build. `DOA4_LEAN=1` compiles
   out the project's debug tooling; Tracy and perf counters off, FidelityFX on.
 - `win-amd64-relwithdebinfo` — the **dev** build, keeping the F5/F6 debug tab,
-  the state poller and the draw probe. See [docs/debug.md](docs/debug.md).
+  the F8 free camera, the F9/F11 stage tools and stage overlay, the state poller and the draw probe. See [docs/debug.md](docs/debug.md).
 
 The launcher and compiler are plain Rust and need no game data:
 

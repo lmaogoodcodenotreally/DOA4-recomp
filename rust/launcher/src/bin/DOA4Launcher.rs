@@ -5,7 +5,7 @@ use doa4_launcher::*;
 use std::path::{Path, PathBuf};
 
 #[derive(PartialEq, Clone, Copy)]
-enum Tab { Display, Graphics, Input, Paths }
+enum Tab { Display, Graphics, Input, Debug, Paths }
 
 struct App {
     dir: PathBuf,
@@ -15,6 +15,27 @@ struct App {
     /// Physical size of the monitor, once egui has told us. Used for the
     /// "match my display" aspect-ratio shortcut.
     monitor: Option<(f32, f32)>,
+    /// The bind waiting for a key press ("..." on its button).
+    capturing: Option<&'static str>,
+}
+
+/// The game's name for a key egui reports, if the game can bind it.
+fn game_key_name(k: egui::Key) -> Option<String> {
+    use egui::Key::*;
+    let fixed = match k {
+        ArrowLeft => "Left", ArrowRight => "Right", ArrowUp => "Up", ArrowDown => "Down",
+        Enter => "Return", Space => "Space", Tab => "Tab", Backspace => "Backspace",
+        Delete => "Delete", Insert => "Insert", Home => "Home", End => "End",
+        PageUp => "PageUp", PageDown => "PageDown", Minus => "Minus", Plus | Equals => "Plus",
+        Comma => "Comma", Period => "Period", Semicolon => "Semicolon", Slash => "Slash",
+        Backslash => "Backslash", OpenBracket => "LBracket", CloseBracket => "RBracket",
+        Quote => "Quote", Backtick => "Backtick",
+        Num0 => "0", Num1 => "1", Num2 => "2", Num3 => "3", Num4 => "4",
+        Num5 => "5", Num6 => "6", Num7 => "7", Num8 => "8", Num9 => "9",
+        // Letters and F1-F24 are spelled the same by egui and the game.
+        _ => return Some(k.name().to_string()).filter(|n| KEY_NAMES.contains(&n.as_str())),
+    };
+    Some(fixed.to_string())
 }
 
 impl App {
@@ -26,13 +47,64 @@ impl App {
         if cfg.dev_exe.is_empty() { cfg.dev_exe = dev; }
         if cfg.data_root.is_empty() { cfg.data_root = data; }
         for s in all() { cfg.game.entry(s.key.to_string()).or_insert(s.default.to_string()); }
-        Self { dir, cfg, status: String::new(), tab: Tab::Display, monitor: None }
+        Self { dir, cfg, status: String::new(), tab: Tab::Display, monitor: None, capturing: None }
+    }
+
+    /// While a bind is capturing, the next key press becomes its key (Escape
+    /// cancels). The press is consumed so no widget also reacts to it.
+    fn capture_key(&mut self, ctx: &egui::Context) {
+        let Some(key) = self.capturing else { return };
+        let pressed = ctx.input(|i| i.events.iter().find_map(|e| match e {
+            egui::Event::Key { key, pressed: true, repeat: false, .. } => Some(*key),
+            _ => None,
+        }));
+        let Some(k) = pressed else { return };
+        ctx.input_mut(|i| { i.consume_key(egui::Modifiers::NONE, k); i.events.clear(); });
+        if k == egui::Key::Escape {
+            self.capturing = None;
+            return;
+        }
+        match game_key_name(k) {
+            Some(name) => {
+                self.cfg.game.insert(key.to_string(), name);
+                self.capturing = None;
+            }
+            None => self.status = format!("{} cannot be bound; press another key.", k.name()),
+        }
+    }
+
+    /// A key bind: click it, then press the new key. The arrow resets it.
+    fn bind_row(&mut self, ui: &mut egui::Ui, s: &Setting) {
+        let v = self.cfg.game.get(s.key).cloned().unwrap_or_else(|| s.default.to_string());
+        ui.horizontal(|ui| {
+            let waiting = self.capturing == Some(s.key);
+            let text = if waiting { "...".to_string() } else { v.clone() };
+            let r = ui.add(egui::Button::new(text).min_size(egui::vec2(90.0, 0.0)).selected(waiting))
+                .on_hover_text(format!("{}\n\nClick, then press the new key (Escape cancels).", s.help));
+            if r.clicked() {
+                self.capturing = if waiting { None } else { Some(s.key) };
+            }
+            let reset = ui.add_enabled(v != s.default, egui::Button::new("\u{21BA}"))
+                .on_hover_text(format!("Reset to {}", s.default));
+            if reset.clicked() {
+                self.cfg.game.insert(s.key.to_string(), s.default.to_string());
+                if waiting { self.capturing = None; }
+            }
+            if let Some(other) = bind_conflict(&self.cfg, s.key, &v) {
+                ui.colored_label(egui::Color32::from_rgb(220, 150, 60), format!("also used by {other}"));
+            }
+        });
     }
 
     /// One settings row: label on the left, control on the right, the same
     /// explanation on the hover of both.
     fn row(&mut self, ui: &mut egui::Ui, s: &Setting) {
         ui.label(s.label).on_hover_text(s.help);
+        if s.kind == Kind::Key {
+            self.bind_row(ui, s);
+            ui.end_row();
+            return;
+        }
         let v = self.cfg.game.entry(s.key.to_string()).or_insert(s.default.to_string());
         let r = if s.kind == Kind::Bool && s.choices.is_empty() {
             let mut b = v == "true";
@@ -127,6 +199,7 @@ impl eframe::App for App {
         if self.monitor.is_none() {
             self.monitor = ctx.input(|i| i.viewport().monitor_size).map(|s| (s.x, s.y));
         }
+        self.capture_key(ctx);
         let built = game_built(&self.cfg);
 
         egui::TopBottomPanel::top("head").show(ctx, |ui| {
@@ -149,7 +222,9 @@ impl eframe::App for App {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 for (t, name) in [(Tab::Display, "Display"), (Tab::Graphics, "Graphics"),
-                                  (Tab::Input, "Input"), (Tab::Paths, "Paths")] {
+                                  (Tab::Input, "Input"), (Tab::Debug, "Debug"), (Tab::Paths, "Paths")] {
+                    // Debug switches only exist in a developer build.
+                    if t == Tab::Debug && self.cfg.dev_exe.is_empty() { continue; }
                     ui.selectable_value(&mut self.tab, t, name);
                 }
             });
@@ -213,6 +288,15 @@ impl eframe::App for App {
                              after the game is restarted.").weak());
                     }
                     Tab::Input => self.tab_body(ui, "input", input()),
+                    Tab::Debug => {
+                        if !self.cfg.use_dev {
+                            ui.label(egui::RichText::new(
+                                "These only take effect with the Developer build selected on the Paths tab.")
+                                .weak());
+                            ui.add_space(8.0);
+                        }
+                        self.tab_body(ui, "debug", debug());
+                    }
                     Tab::Paths => {
                         self.path_row(ui, "Game executable", false, 0);
                         ui.add_space(6.0);
@@ -227,11 +311,11 @@ impl eframe::App for App {
                         }
                         ui.add_space(12.0);
                         if ui.button("Re-detect").clicked() {
-                            let (lean, dev, data) = auto_detect(&self.dir);
-                            self.cfg.lean_exe = lean;
-                            self.cfg.dev_exe = dev;
-                            self.cfg.data_root = data;
-                            self.status = "Paths re-detected.".into();
+                            self.status = if redetect(&mut self.cfg, auto_detect(&self.dir)) {
+                                "Missing paths re-detected.".into()
+                            } else {
+                                "All paths are valid; nothing changed.".into()
+                            };
                         }
                     }
                 }

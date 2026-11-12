@@ -26,7 +26,8 @@ fn wrap(text: &str, width: usize, indent: usize) -> Vec<String> {
 }
 
 fn show(cfg: &Config, with_help: bool) {
-    for (group, items) in [("Display", display()), ("Graphics", graphics()), ("Input", input())] {
+    for (group, items) in [("Display", display()), ("Graphics", graphics()), ("Input", input()),
+                           ("Debug (developer build only)", debug())] {
         if group == "Graphics" {
             let name = active_preset(cfg).unwrap_or("Custom");
             println!("\n{group}  [preset: {name}]");
@@ -59,6 +60,10 @@ fn set(cfg: &mut Config, kv: &str) -> bool {
     let Some(s) = all().into_iter().find(|s| s.key == k) else { return false };
     if !s.choices.is_empty() && !s.choices.iter().any(|(val, _)| *val == v) {
         eprintln!("{k}: expected one of {}", s.choices.iter().map(|(val, _)| *val).collect::<Vec<_>>().join(", "));
+        return false;
+    }
+    if s.kind == Kind::Key && !KEY_NAMES.contains(&v) {
+        eprintln!("{k}: expected a key name, one of {}", KEY_NAMES.join(", "));
         return false;
     }
     if s.kind == Kind::Bool && s.choices.is_empty() && v != "true" && v != "false" {

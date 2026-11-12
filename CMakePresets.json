@@ -106,7 +106,9 @@
             "inherits": "windows-base",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-                "REXGLUE_ENABLE_FIDELITYFX": "ON"
+                "REXGLUE_ENABLE_FIDELITYFX": "ON",
+                "CMAKE_C_FLAGS": "-march=x86-64-v3",
+                "CMAKE_CXX_FLAGS": "-march=x86-64-v3"
             }
         },
         {
