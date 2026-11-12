@@ -95,6 +95,9 @@ pub fn graphics() -> Vec<Setting> {
         setting("scaled_point_filter_linear", Kind::Bool, "true", "Smooth 2D art",
             "Smooths menus and HUD artwork when the internal resolution is above 1x. Turn it off \
              for a sharper, more pixelated look.", &[]),
+        setting("ssao_strength", Kind::Double, "0", "Ambient occlusion",
+            "Soft contact shadows in creases and where objects meet, such as cloth folds and the              base of railings. Needs an internal resolution above 1x. Costs a little GPU time.",
+            &[("0", "Off"), ("0.6", "Subtle"), ("1", "Strong")]),
         advanced("draw_resolution_scale_x", Kind::Int, "1", "Render scale X",
             "Per-axis render scale. Anything above 1 overrides Internal resolution for this axis, \
              so 3 x 2 renders wider than it does tall. Takes effect after a restart.",
@@ -226,7 +229,7 @@ pub fn presets() -> &'static [Preset] {
                 ("resolution_scale", "1"), ("draw_resolution_scale_x", "1"), ("draw_resolution_scale_y", "1"),
                 ("native_2x_msaa", "false"), ("swap_post_effect", "fxaa"),
                 ("anisotropic_override", "2"), ("present_effect", "cas"),
-                ("scaled_point_filter_linear", "true"),
+                ("scaled_point_filter_linear", "true"), ("ssao_strength", "0"),
             ],
         },
         Preset {
@@ -236,7 +239,7 @@ pub fn presets() -> &'static [Preset] {
                 ("resolution_scale", "2"), ("draw_resolution_scale_x", "1"), ("draw_resolution_scale_y", "1"),
                 ("native_2x_msaa", "true"), ("swap_post_effect", "none"),
                 ("anisotropic_override", "3"), ("present_effect", "cas"),
-                ("scaled_point_filter_linear", "true"),
+                ("scaled_point_filter_linear", "true"), ("ssao_strength", "0"),
             ],
         },
         Preset {
@@ -247,7 +250,7 @@ pub fn presets() -> &'static [Preset] {
                 ("resolution_scale", "3"), ("draw_resolution_scale_x", "1"), ("draw_resolution_scale_y", "1"),
                 ("native_2x_msaa", "true"), ("swap_post_effect", "fxaa"),
                 ("anisotropic_override", "5"), ("present_effect", "cas"),
-                ("scaled_point_filter_linear", "true"),
+                ("scaled_point_filter_linear", "true"), ("ssao_strength", "0.6"),
             ],
         },
     ]

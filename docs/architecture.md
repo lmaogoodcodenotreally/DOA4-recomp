@@ -84,3 +84,30 @@ bind parser knows are accepted (`KEY_NAMES` in `rust/launcher/src/lib.rs`,
 mirroring `keybinds.cpp`; egui cannot tell numpad keys apart, so those are
 only reachable through the console launcher). A bind that clashes with
 another bind or a runtime default (F3, F4, F7, Backtick) is flagged.
+
+## Ambient occlusion (SDK, `src/graphics/d3d12/render_target_cache_ssao.cpp`)
+
+Launcher option "Ambient occlusion" sets `ssao_strength` (0 off, 0.6, 1);
+`ssao_radius` (default 10, in near-plane units) and `ssao_debug` (AO term
+alone) are hand-set cvars. DOA4's character shadows are already blurred
+projective maps, so AO in creases was the cheaper visible gain. Only with a
+render scale above 1x (it works on the scaled resolve buffer).
+
+- **Finding the scene.** Each main-pass tile resolves raw depth, then colour
+  (8888), from the same EDRAM surface into scene-sized textures (pitch
+  ≥ 1024x576). `SsaoNoteResolve` keys on `RB_SURFACE_INFO` + dest pitch;
+  `RB_COLOR_INFO`/`RB_DEPTH_INFO` are repointed per copy and depth dest
+  format is rewritten to k_24_8, so neither can be matched. The lowest base
+  of each kind is the texture origin.
+- **When.** `SsaoFlushIfLeavingSurface` runs at the next draw or resolve on a
+  different surface, i.e. after both tiles and before the bloom / DOF passes
+  read the scene.
+- **Passes.** `ssao_ao_cs` reads the tiled depth straight from the scaled
+  buffer (layout from `texture_load_32bpb_scaled_cs`), 8-sample SAO with a
+  4x4 rotation, into an R16G16F (ao, log2 z) texture. `ssao_apply_cs` does a
+  4x4 depth-aware blur and multiplies RGB in place, keeping alpha.
+- **Gotcha.** `PushTransitionBarrier` is a no-op for UAV -> UAV, so the
+  resolve copy's UAV writes raced the apply pass (copy landed last, AO
+  invisible). The apply pass pushes an explicit UAV barrier.
+- **Cost.** Attract bench at 3x2: busy 9.24-9.31 ms on vs 9.24 off,
+  out-of-time 0.1-0.2% both - within noise.
