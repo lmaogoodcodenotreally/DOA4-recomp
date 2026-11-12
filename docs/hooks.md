@@ -234,6 +234,13 @@ frame. The replay is handed over in 64 KB pieces to overlap too. Attract A/B
 (150 s, RX 7900 XTX, 3x2 scale): busy 12.8 → 11.3 ms per tick, out-of-time
 frames 176 → 84. The per-10-second dump frame that the interpolation
 diagnostics used to log in every build now needs `frame_interp_diag`.
+Ground truth from a packet probe: the swap ends its indirect buffer (NOP
+padding) and two `EVENT_WRITE_SHD` fences follow it in the primary ring,
+before the flip wait and the first draw. The pairing and replay used to run
+at the swap, holding those fences ~7.5 ms; they now run at the next packet
+that is neither a NOP nor that fence, or at the end of the primary buffer.
+Attract: busy 11.3 → 10.9 ms, out-of-time 384 → 40 of 7800 frames, replay
+data restores unchanged.
 
 ## All stages in Versus (`src/doa4_all_stages.cpp`, dev build only)
 
