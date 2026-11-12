@@ -221,6 +221,20 @@ queue the guest also renders on. Two causes:
 After the fix, F5 open: 60.0 fps, 600 presents per 600 frames, 0.25 ms per
 paint. With interpolation and F5 open: ~59 real fps instead of ~42.
 
+**GPU thread budget with frame interpolation (SDK).** The guest never waits
+on itself: its only long ring wait is the flip throttle (`WAIT_REG_MEM` until
+the vblank ISR clears `0x1F56D004`), and its main thread spends ~85% spinning
+in its D3D library waiting for our GPU thread. That thread does the real
+frame, the in-between replay, the pairing and, before, the driver's recording
+of every D3D12 command list, serially; when they don't fit in a tick the
+in-between frame is skipped ("out of time"). `d3d12_async_submission` (on)
+moves the recording and `ExecuteCommandLists` to a worker; swaps and direct
+queue signals drain it first, so the presenter's fence still follows the
+frame. The replay is handed over in 64 KB pieces to overlap too. Attract A/B
+(150 s, RX 7900 XTX, 3x2 scale): busy 12.8 → 11.3 ms per tick, out-of-time
+frames 176 → 84. The per-10-second dump frame that the interpolation
+diagnostics used to log in every build now needs `frame_interp_diag`.
+
 ## All stages in Versus (`src/doa4_all_stages.cpp`, dev build only)
 
 The VS stage select is built by `sub_82537458` from a static 17-entry table at
