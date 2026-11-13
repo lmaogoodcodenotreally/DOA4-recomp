@@ -51,8 +51,9 @@ pub fn display() -> Vec<Setting> {
             "Pad the picture out to 16:9 with black bars instead of filling the screen. Leave this \
              off for widescreen; turn it on if you want the original framing exactly.", &[]),
         setting("frame_interp", Kind::Bool, "false", "Frame interpolation",
-            "Experimental. Inserts generated in-between frames for roughly double the visual \
-             smoothness. The game's own logic still runs at 60 Hz, and fast motion can show \
+            "Experimental. Inserts generated in-between frames: double the visual smoothness, \
+             and up to your monitor's refresh rate on faster screens when the PC has time to \
+             spare. The game's own logic still runs at 60 Hz, and fast motion can show \
              artefacts, so turn it off again if anything looks wrong.", &[]),
         setting("d3d12_allow_variable_refresh_rate_and_tearing", Kind::Bool, "false", "Screen sync",
             "V-Sync locks to your monitor and avoids tearing. Off lets the image tear, which is \
