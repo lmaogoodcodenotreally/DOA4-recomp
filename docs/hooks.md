@@ -319,3 +319,37 @@ every 20 frames, which made the MK awnings rock hard in the preview. A
 fight, as checked on a real 360, uses MK's own slow sway. The hook runs
 `sub_8257E840` after the activation in mode 3, as a fight does, but only when
 the cursor index matches the stage being activated (`dword_82E76830`).
+
+## Emitter draw race (`src/doa4_emitter_draw.cpp`)
+
+An emitter group (vtable `0x8229E29C`) keeps two lists of its children
+(`+148`/`+152`, last index at `+156`/`+160`, -1 = empty). Its update
+(`sub_82545B88`, on a worker thread) fills list `[+104]` with the children
+still alive (state word `+0x5C`, read through vtable+48 `sub_826398E8`),
+unlinks the dead ones, and flips `+104`. Its draw (`sub_82545D70`, on the main
+thread) draws list `[+108]` and flips `+108`, so each frame shows the list the
+previous update built. When the frame's update kills a child (MK's market cart
+breaking, drawn through `sub_82651BD8`) before or while the draw runs, the
+draw finds that child dead and draws nothing for it. Its replacement (the
+cart's pieces) is only in the next list. The result is a frame with neither:
+the cart vanishes for one frame. If the draw runs first there is no gap,
+which is why it came and went (every interp-on run, one of two interp-off
+runs).
+
+The hook runs before the draw. For each child of the list about to be drawn
+whose state is 0, if its class is one seen dying this way in attract
+(`0x8229E690`, `0x8229E480`, `0x8229E530`), it copies the child (0x140 bytes:
+the stride of `0x8229E690`'s static instances, past the base fields the
+others use) to scratch guest memory with the state set to 1. It points the
+list slot at the copy with a compare-and-swap, calls the draw, and swaps the
+slot back unless the update rewrote it in between. The child is drawn one
+last time, as it would be if the draw had won the race. The game's own
+objects are never written. The dev build logs each class found dead under a
+drawn list with `DOA4_EMITTER_LOG=1`, marking classes missing from the
+table as "unhandled".
+
+A whole-attract scan for draws missing for exactly one frame (per-draw keys
+from the frame recorder) found nothing else of this kind. The one-frame
+drops left in TCR are stage parts (`sub_8254C9C0`, table `off_82F19B30`)
+culled by the bounding-sphere test (`sub_825454D0` -> `sub_8276B9D0`) at the
+edge of the view as the camera pans.

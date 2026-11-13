@@ -64,6 +64,7 @@ set(DOA4RETAIL_SOURCES
     src/doa4_stage_debug.cpp
     src/doa4_all_stages.cpp
     src/doa4_glow_tuner.cpp
+    src/doa4_emitter_draw.cpp
 )
 
 if(WIN32)
