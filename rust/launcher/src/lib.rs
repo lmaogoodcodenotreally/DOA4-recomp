@@ -116,6 +116,11 @@ pub fn graphics() -> Vec<Setting> {
             "Per-axis render scale. Anything above 1 overrides Internal resolution for this axis. \
              Takes effect after a restart.",
             &[("1", "1x"), ("2", "2x"), ("3", "3x"), ("4", "4x"), ("5", "5x"), ("6", "6x"), ("7", "7x"), ("8", "8x")]),
+        advanced("gpu_upload_prefetch", Kind::Bool, "true", "Batched geometry uploads",
+            "Sends the game's moving geometry to the GPU in one batch at the end of each frame \
+             instead of piece by piece while drawing. Saves roughly a fifth of the GPU's time and \
+             leaves more room for frame interpolation. Turn it off only if something looks wrong.",
+            &[]),
     ]
 }
 
