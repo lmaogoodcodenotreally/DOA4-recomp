@@ -111,3 +111,36 @@ render scale above 1x (it works on the scaled resolve buffer).
   invisible). The apply pass pushes an explicit UAV barrier.
 - **Cost.** Attract bench at 3x2: busy 9.24-9.31 ms on vs 9.24 off,
   out-of-time 0.1-0.2% both - within noise.
+
+## Character shadows (SDK, `src/graphics/d3d12/render_target_cache_shadow.cpp`)
+
+Launcher option "Character shadows" sets `shadow_quality` (0 original, 1 = 4x,
+2 = 8x the guest shadow texture); advanced `shadow_softness` (default 0.5,
+1 = about the game's own blur). Off by default; the Quality preset picks 8x.
+Host render target path only.
+
+- **The game's pass** (per frame, traced): into a 256x256 8888 + D24S8
+  surface (`RB_SURFACE_INFO` 0x04000140), a full-screen textureless triangle
+  (the lit background) and ~30 textureless caster draws; resolve to A; two
+  full-screen blur passes sampling A, each resolved back to A; a copy of the
+  surface to B (with a colour clear). The stage receivers fetch B (bilinear,
+  border clamp) and `mad_sat` it into the lighting. No depth compare, so no
+  self-shadowing; the same surface then draws a small reflection scene.
+- **Mirroring.** After each guest draw, `ShadowMirrorDraw` re-issues
+  textureless draws into small single-sample 8888 + depth surfaces on a
+  private target at the shadow scale. Draws that sample A on the caster
+  surface mark the blur; `ShadowNoteResolve` follows A -> (blurs into A) ->
+  B and, at B, blurs the private copy (separable Gaussian, `shadow_blur_cs`)
+  and registers it with `D3D12TextureCache::SetHiResOverride`, so fetches of
+  B's address and size sample the high-resolution mask (bindless and
+  bindful). Any other resolve to B drops the stand-in.
+- **Gotcha.** The host viewport is the whole 8192-pixel guest range times the
+  draw scale, with the guest mapping done in the vertex shader (ndc
+  scale/offset). Scaling it again exceeds `D3D12_VIEWPORT_BOUNDS_MAX` and the
+  draws vanish, so the mirrored draw gets a viewport from
+  `GetHostViewportInfo` at the shadow scale and one-use system constants with
+  that NDC transformation.
+- **Cost.** Play settings (3x2, 2x MSAA, CAS, interpolation), interleaved
+  with the committed build: busy 12.22 ms at 8x vs 12.34 / 12.34 off,
+  out-of-time 9.5% vs 7.1-9.5% - within noise (attract content swings runs
+  far more than this).

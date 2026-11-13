@@ -96,8 +96,17 @@ pub fn graphics() -> Vec<Setting> {
             "Smooths menus and HUD artwork when the internal resolution is above 1x. Turn it off \
              for a sharper, more pixelated look.", &[]),
         setting("ssao_strength", Kind::Double, "0", "Ambient occlusion",
-            "Soft contact shadows in creases and where objects meet, such as cloth folds and the              base of railings. Needs an internal resolution above 1x. Costs a little GPU time.",
+            "Soft contact shadows in creases and where objects meet, such as cloth folds and the \
+             base of railings. Needs an internal resolution above 1x. Costs a little GPU time.",
             &[("0", "Off"), ("0.6", "Subtle"), ("1", "Strong")]),
+        setting("shadow_quality", Kind::Int, "0", "Character shadows",
+            "Draws the fighters' shadows on the floor from a much sharper silhouette, with soft \
+             edges, instead of the console's small blurred one. Costs very little GPU time.",
+            &[("0", "Original"), ("1", "Sharp"), ("2", "Sharpest")]),
+        advanced("shadow_softness", Kind::Double, "0.5", "Character shadow softness",
+            "How soft the edges of the sharper character shadows are. Only applies when Character \
+             shadows is not Original.",
+            &[("0.25", "Crisp"), ("0.5", "Default"), ("1", "Very soft")]),
         advanced("draw_resolution_scale_x", Kind::Int, "1", "Render scale X",
             "Per-axis render scale. Anything above 1 overrides Internal resolution for this axis, \
              so 3 x 2 renders wider than it does tall. Takes effect after a restart.",
@@ -230,6 +239,7 @@ pub fn presets() -> &'static [Preset] {
                 ("native_2x_msaa", "false"), ("swap_post_effect", "fxaa"),
                 ("anisotropic_override", "2"), ("present_effect", "cas"),
                 ("scaled_point_filter_linear", "true"), ("ssao_strength", "0"),
+                ("shadow_quality", "0"),
             ],
         },
         Preset {
@@ -240,6 +250,7 @@ pub fn presets() -> &'static [Preset] {
                 ("native_2x_msaa", "true"), ("swap_post_effect", "none"),
                 ("anisotropic_override", "3"), ("present_effect", "cas"),
                 ("scaled_point_filter_linear", "true"), ("ssao_strength", "0"),
+                ("shadow_quality", "0"),
             ],
         },
         Preset {
@@ -251,6 +262,7 @@ pub fn presets() -> &'static [Preset] {
                 ("native_2x_msaa", "true"), ("swap_post_effect", "fxaa"),
                 ("anisotropic_override", "5"), ("present_effect", "cas"),
                 ("scaled_point_filter_linear", "true"), ("ssao_strength", "0.6"),
+                ("shadow_quality", "2"),
             ],
         },
     ]
